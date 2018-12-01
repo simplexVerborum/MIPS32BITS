@@ -78,7 +78,7 @@ initial begin
         //$display("code = $b, data = %b", code, data);
         RAM.Mem[loadPC] = data;
         #5 test_ram_out = RAM.Mem[loadPC];
-        $display("space=%d, memory_data=%b", loadPC,test_ram_out);
+        // $display("space=%d, memory_data=%b", loadPC,test_ram_out);
         loadPC = loadPC + 1;
     end
     $fclose(fileIn);
@@ -195,26 +195,26 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
 
     6'b100100:begin //bitwise and
     V = 1'b0;
-    assign C = 1'b0;
-    assign Y = A & B;
+    C = 1'b0;
+    Y = A & B;
     end
 
     6'b100101:begin //bitwise or
     V = 1'b0;
     C = 1'b0;
-    assign Y = A | B;
+    Y = A | B;
     end
 
     6'b100111:begin //bitwise nor
     V = 1'b0;
     C = 1'b0;
-    assign Y = ~(A | B);
+    Y = ~(A | B);
     end
 
     6'b100110:begin //bitwise ex-or
     V = 1'b0;
     C = 1'b0;
-    assign Y = A ^ B;
+    Y = A ^ B;
     end
 
     6'b100001://Cuenta la cantidad de unos consecuticvos empezando en el bit mas significativo.
@@ -237,7 +237,7 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
     begin
     V = 1'b0;
     C = 1'b0;
-    assign Y = A<B;
+    Y = A<B;
     end
 
     6'b101010://"menor que" con signo
@@ -246,16 +246,16 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
     C = 1'b0;
     assign C = 1'b0;
     if((A[31]==1'b1 && B[31]==1'b0) || (A[31]==1'b0 && B[31]==1'b1))
-    assign Y = A>B;
+    Y = A>B;
     else
-    assign Y = A<B;
+    Y = A<B;
     end
 
     6'b100000://suma con signo
     begin
         V = 1'b0;
         C = 1'b0;
-        assign {C,Y} = A + B;
+        {C,Y} = A + B;
         if(A[31]==1'b0 && B[31]==1'b0 && Y[31]==1)
             V = 1'b1;
         else if(A[31]==1'b1 && B[31]==1'b1 && Y[31]==0)
@@ -266,8 +266,8 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
     begin
         V = 1'b0;
         assign C = 1'b0;
-        assign Y = ~B;
-        assign {C,Y} = A + Y + 1;
+        Y = ~B;
+        {C,Y} = A + Y + 1;
         if(A[31]==1'b0 && B[31]==1'b1 && Y[31]==1)
             V = 1'b1;
         else if(A[31]==1'b1 && B[31]==1'b0 && Y[31]==0)
@@ -278,28 +278,28 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
     begin
     V = 1'b0;
     assign C = 1'b0;
-    assign {C,Y}=A<<B;
+    {C,Y}=A<<B;
     end
 
     6'b000010: //shift right logico
     begin
     V = 1'b0;
     C = 1'b0;
-    assign {C,Y}=A>>B;
+    {C,Y}=A>>B;
     end
 
     6'b000011:
     begin
     V = 1'b0;
     C = 1'b0;
-    assign Y=A>>>B;
+    Y=A>>>B;
     end
 
     6'b111111://Load upper immediate
     begin
     V = 1'b0;
     C = 1'b0;
-    assign {C,Y}=B<<16;
+    {C,Y}=B<<16;
     end
     endcase
     end
@@ -387,6 +387,11 @@ else
 	if(clock)
 		state = prev;
 	next = state;
+
+	$display("state =========================>  %b", state);
+	$display("next =========================>  %b", next);
+
+
 	end
 endmodule
 
@@ -568,6 +573,7 @@ case(prev)
 	5'b10101: //State 21
 		next = 5'b00001;
 endcase
+
 endmodule
 
 // Control Unit
@@ -576,4 +582,5 @@ wire [4:0] state, next;
 StateRegister SR(state, next, clock, reset);
 ControlSignalEncoder CSE(signals, state);
 NextStateDecoder NSD(next, state, opcode, MOC);
+
 endmodule
