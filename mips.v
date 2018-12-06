@@ -1,5 +1,7 @@
-module MipsProcessor(output [31:0]DataOut, input [31:0]instruction, input reset, clock);
+module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
+//ProgramCounter
+reg [8:0] PC = 0;
 //Control Unit Variables
 wire [13:0]CUOut;
 reg [5:0]CuInput;
@@ -20,8 +22,8 @@ wire MemRead = CUOut[10];
 wire Branch = CUOut[11];
 wire Jump = CUOut[12];
 wire RegDst = CUOut[13];
-reg [7:0] test_ram_out;
-reg[8:0] loadPC;
+
+
 
 //Register File Variables
 wire [31:0] OutRF_InAluA, OutRF_InAluSrcB;//B va para el mux
@@ -58,7 +60,7 @@ wire [15:0] dataIn;
 
 //ALU Control Variables
 wire [5:0] funct;
-
+wire [31:0] instruction = RAMDataOut;
 //Instruction to corresponding variables
 assign CUInput = instruction[31:26];
 assign outputSelectorA = instruction[25:21];
@@ -67,23 +69,6 @@ assign IR20_16 = instruction[20:16];
 assign IR15_11 = instruction[15:11];
 assign dataIn = instruction[15:0];
 
-integer fileIn, code; reg [31:0] data;
-
-initial begin
-    fileIn = $fopen("testcode.txt", "r");
-    loadPC = 9'd0;
-    //done = 0;
-    while (!$feof(fileIn)) begin
-        code = $fscanf(fileIn, "%b", data);
-        //$display("code = $b, data = %b", code, data);
-        RAM.Mem[loadPC] = data;
-        #5 test_ram_out = RAM.Mem[loadPC];
-        // $display("space=%d, memory_data=%b", loadPC,test_ram_out);
-        loadPC = loadPC + 1;
-    end
-    $fclose(fileIn);
-    //done = 1;
-end
 
 //Datpath
 RegisterFile RegF(OutRF_InAluA, OutRF_InAluSrcB, MemtoRegMuxOut, destination, outputSelectorA, outputSelectorB, regWrite, clock);
@@ -92,7 +77,7 @@ RegDstMux RegDstMux1(destination, IR20_16, IR15_11, RegDst);
 Alu_32bits alu1(AluOut, C, V, operation, OutRF_InAluA, outAluSrc_InAlu);
 MAR mar1(MAROutput, AluOut, MARLd, clock);
 MDR mdr1(MDROuput, OutRF_InAluSrcB, MDRLd, clock);
-ram512x8 RAM(RAMDataOut,MOC,MOV,MemRead,MemWrite,MAROutput,MDROuput);
+ram512x8 RAM(RAMDataOut, MOC, MOV, MemRead, MemWrite, MAROutput, MDROuput);
 MemToRegMux MemToRegMux1(MemtoRegMuxOut, RAMDataOut, AluOut, MemToReg);
 Extender singExtender(singExtended, dataIn);
 ALUControl ALUControl(operation, funct, AluOp2, AluOp1, AluOp0);
@@ -108,12 +93,15 @@ module MAR(Qs, Ds, Ld, CLK);
   
   initial begin
   	Qs= 32'd0;
+		$display("MARLd =========================>  %b", Ld);
   end
-  
-  always @(Qs, Ld, CLK)
-    if(Ld && CLK)
-      Qs<=Ds;
-  
+
+always@(posedge CLK)
+	if (Ld) begin
+		Qs<=Ds;
+		$display("MAR =========================>  %b", Qs);
+		$display("MARLd =========================>  %b", Ld);
+	end
 endmodule
 
 //MDR Module
@@ -127,9 +115,10 @@ module MDR(Qs, Ds, Ld, CLK);
   	Qs= 32'd0;
   end
   
-  always @(Qs, Ld, CLK)
-    if(Ld && CLK)
-      Qs<=Ds;
+always@(posedge CLK)
+	if (Ld) begin
+		Qs<=Ds;
+	end
   
 endmodule
 
@@ -308,8 +297,28 @@ endmodule
 //Memory with MemRead and MemWrite
 module ram512x8 (output reg [31:0] DataOut, output reg MOC,
 input MOV, MemRead, MemWrite, input [8:0] Address, input [31:0] DataIn);
+
+integer fileIn, code; reg [31:0] data;
+	reg[8:0] loadPC;
+	reg [7:0] test_ram_out;
+initial begin
+	fileIn = $fopen("testcode.txt", "r");
+	loadPC = 9'd0;
+	//done = 0;
+	while (!$feof(fileIn)) begin
+			code = $fscanf(fileIn, "%b", data);
+			// $display("code = $b, data = %b", code, data);
+			RAM.Mem[loadPC] = data;
+			test_ram_out = RAM.Mem[loadPC];
+			// $display("space=%d, memory_data=%b", loadPC,test_ram_out);
+			loadPC = loadPC + 1;
+	end
+	$fclose(fileIn);
+	//done = 1;
+end
+
 reg [7:0] Mem[0:511];
-always @(MOV) //Whenever Enable and/or MOV is active
+always @(posedge MOV) //Whenever Enable and/or MOV is active
 if(MOV) //If MOV=1, proceed with ReadWrite
 	begin
 	if(MemRead) //Read Operation (1)
@@ -326,8 +335,9 @@ if(MOV) //If MOV=1, proceed with ReadWrite
 		Mem[Address+2] = DataIn[15:8];
 		Mem[Address+3] = DataIn[7:0];
 		#1 DataOut = Mem[Address];
-		MOC = 1'b1;
-		#2 MOC = 1'b0;
+		// MOC = 1'b1;
+		// #2 MOC = 1'b0;
+		MOC = MOV;
 		end
 	end
 endmodule
@@ -375,7 +385,7 @@ endmodule
 //State Register
 module StateRegister(output reg [4:0] next, input [4:0] prev, input clock, clear);
 reg [4:0] state;
-always@(clock, clear)
+always@(posedge clock)
 if(clear)
 	begin
 	if(clock)
@@ -389,8 +399,6 @@ else
 	next = state;
 
 	$display("state =========================>  %b", state);
-	$display("next =========================>  %b", next);
-
 
 	end
 endmodule
@@ -465,114 +473,119 @@ endcase
 endmodule
 
 //Next State Decoder
-module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opcode, input MOC);
-always@(prev)
-case(prev)
-	5'b00000: //State 0
-	next = 5'b00001;
-	5'b00001: //State 1
-	next = 5'b00010;
-	5'b00010: //State 2
-	next = 5'b00011;
-	5'b00011: //State 3
-	if(MOC)
-		next = 5'b00100;
-	else
+module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opcode, input MOC, input reset);
+always@(prev,opcode, MOC, reset, next)
+if (reset) begin
+	next = 5'b00000;
+end else begin
+	case(prev)
+		5'b00000: //State 0
+		next = 5'b00001;
+		5'b00001: //State 1
+		next = 5'b00010;
+		5'b00010: //State 2
 		next = 5'b00011;
-	5'b00100: //State 4
-	case(opcode)
-		6'b000000: //Go to State 5
-		next = 5'b00101;
-		6'b001000: //Go to State 6
-		next = 5'b00110;
-		6'b001001: //Go to State 6
-		next = 5'b00110;
-		6'b001010: //Go to State 7
-		next = 5'b00111;
-		6'b001011: //Go to State 7
-		next = 5'b00111;
-		6'b001100: //Go to State 8
-		next = 5'b01000;
-		6'b001101: //Go to State 9
-		next = 5'b01001;
-		6'b001110: //Go to State 10
-		next = 5'b01010;
-		6'b001111: //Go to State 11
-		next = 5'b01011;
-		6'b000100: //Go to State 12
-		next = 5'b01100;
-		6'b000001: //Go to State 12
-		next = 5'b01100;
-		6'b000111: //Go to State 12
-		next = 5'b01100;
-		6'b000110: //Go to State 12
-		next = 5'b01100;
-		6'b000101: //Go to State 12
-		next = 5'b01100;
-		6'b000010: //Go to State 13
-		next = 5'b01101;
-		6'b000011: //Go to State 13
-		next = 5'b01101;
-		6'b100011: //Go to State 14
-		next = 5'b01110;
-		6'b100001: //Go to State 14
-		next = 5'b01110;
-		6'b100101: //Go to State 14
-		next = 5'b01110;
-		6'b100000: //Go to State 14
-		next = 5'b01110;
-		6'b100100: //Go to State 14
-		next = 5'b01110;
-		6'b111111: //Go to State 18
-		next = 5'b10010;
-		6'b101011: //Go to State 18
-		next = 5'b10010;
-		6'b101001: //Go to State 18
-		next = 5'b10010;
-		6'b101000: //Go to State 18
-		next = 5'b10010;
+		5'b00011: //State 3
+		if(MOC)
+			next = 5'b00100;
+		else
+			next = 5'b00011;
+		5'b00100: //State 4
+			case(opcode)
+				6'b000000: //Go to State 5
+				MOC =1;
+				next = 5'b00101;
+				6'b001000: //Go to State 6
+				next = 5'b00110;
+				6'b001001: //Go to State 6
+				next = 5'b00110;
+				6'b001010: //Go to State 7
+				next = 5'b00111;
+				6'b001011: //Go to State 7
+				next = 5'b00111;
+				6'b001100: //Go to State 8
+				next = 5'b01000;
+				6'b001101: //Go to State 9
+				next = 5'b01001;
+				6'b001110: //Go to State 10
+				next = 5'b01010;
+				6'b001111: //Go to State 11
+				next = 5'b01011;
+				6'b000100: //Go to State 12
+				next = 5'b01100;
+				6'b000001: //Go to State 12
+				next = 5'b01100;
+				6'b000111: //Go to State 12
+				next = 5'b01100;
+				6'b000110: //Go to State 12
+				next = 5'b01100;
+				6'b000101: //Go to State 12
+				next = 5'b01100;
+				6'b000010: //Go to State 13
+				next = 5'b01101;
+				6'b000011: //Go to State 13
+				next = 5'b01101;
+				6'b100011: //Go to State 14
+				next = 5'b01110;
+				6'b100001: //Go to State 14
+				next = 5'b01110;
+				6'b100101: //Go to State 14
+				next = 5'b01110;
+				6'b100000: //Go to State 14
+				next = 5'b01110;
+				6'b100100: //Go to State 14
+				next = 5'b01110;
+				6'b111111: //Go to State 18
+				next = 5'b10010;
+				6'b101011: //Go to State 18
+				next = 5'b10010;
+				6'b101001: //Go to State 18
+				next = 5'b10010;
+				6'b101000: //Go to State 18
+				next = 5'b10010;
+			endcase
+		5'b00101: //State 5
+		next = 5'b00001;
+		5'b00110: //State 6
+		next = 5'b00001;
+		5'b00111: //State 7
+		next = 5'b00001;
+		5'b01000: //State 8
+		next = 5'b00001;
+		5'b01001: //State 9
+		next = 5'b00001;
+		5'b01010: //State 10
+		next = 5'b00001;
+		5'b01011: //State 11
+		next = 5'b00001;
+		5'b01100: //State 12
+		next = 5'b00001;
+		5'b01101: //State 13
+		next = 5'b00001;
+		5'b01110: //State 14
+		next = 5'b01111;
+		5'b01111: //State 15
+		next = 5'b10000;
+		5'b10000: //State 16
+		if(MOC)
+			next = 5'b10001; //If MOC, go to State 17
+		else
+			next = 5'b10000; //Else, continue waiting for MOC
+		5'b10001: //State 17
+			next = 5'b00001;
+		5'b10010: //State 18
+			next = 5'b10011;
+		5'b10011: //State 19
+			next = 5'b10100;
+		5'b10100: //State 20
+		if(MOC)
+			next = 5'b10101; //If MOC, go to State 21
+		else
+			next = 5'b10100; //Else, continue waiting for MOC
+		5'b10101: //State 21
+			next = 5'b00001;
 	endcase
-	5'b00101: //State 5
-	next = 5'b00001;
-	5'b00110: //State 6
-	next = 5'b00001;
-	5'b00111: //State 7
-	next = 5'b00001;
-	5'b01000: //State 8
-	next = 5'b00001;
-	5'b01001: //State 9
-	next = 5'b00001;
-	5'b01010: //State 10
-	next = 5'b00001;
-	5'b01011: //State 11
-	next = 5'b00001;
-	5'b01100: //State 12
-	next = 5'b00001;
-	5'b01101: //State 13
-	next = 5'b00001;
-	5'b01110: //State 14
-	next = 5'b01111;
-	5'b01111: //State 15
-	next = 5'b10000;
-	5'b10000: //State 16
-	if(MOC)
-		next = 5'b10001; //If MOC, go to State 17
-	else
-		next = 5'b10000; //Else, continue waiting for MOC
-	5'b10001: //State 17
-		next = 5'b00001;
-	5'b10010: //State 18
-		next = 5'b10011;
-	5'b10011: //State 19
-		next = 5'b10100;
-	5'b10100: //State 20
-	if(MOC)
-		next = 5'b10101; //If MOC, go to State 21
-	else
-		next = 5'b10100; //Else, continue waiting for MOC
-	5'b10101: //State 21
-		next = 5'b00001;
-endcase
+end
 
 endmodule
 
@@ -581,6 +594,6 @@ module ControlUnit(output wire [13:0] signals, input [5:0] opcode, input reset, 
 wire [4:0] state, next;
 StateRegister SR(state, next, clock, reset);
 ControlSignalEncoder CSE(signals, state);
-NextStateDecoder NSD(next, state, opcode, MOC);
+NextStateDecoder NSD(next, state, opcode, MOC, reset);
 
 endmodule
