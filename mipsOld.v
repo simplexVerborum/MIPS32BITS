@@ -4,7 +4,7 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 reg [8:0] PC = 0;
 //Control Unit Variables
 wire [13:0]CUOut;
-reg [5:0]CuInput;
+wire [5:0]CUInput;
 wire MOC;
 
 //Control Unit Outputs
@@ -61,6 +61,7 @@ wire [15:0] dataIn;
 //ALU Control Variables
 wire [5:0] funct;
 wire [31:0] instruction = RAMDataOut;
+
 //Instruction to corresponding variables
 assign CUInput = instruction[31:26];
 assign outputSelectorA = instruction[25:21];
@@ -68,6 +69,8 @@ assign outputSelectorB = instruction[20:16];
 assign IR20_16 = instruction[20:16];
 assign IR15_11 = instruction[15:11];
 assign dataIn = instruction[15:0];
+		
+
 
 
 //Datpath
@@ -81,7 +84,7 @@ ram512x8 RAM(RAMDataOut, MOC, MOV, MemRead, MemWrite, MAROutput, MDROuput);
 MemToRegMux MemToRegMux1(MemtoRegMuxOut, RAMDataOut, AluOut, MemToReg);
 Extender singExtender(singExtended, dataIn);
 ALUControl ALUControl(operation, funct, AluOp2, AluOp1, AluOp0);
-ControlUnit CU(CUOut,CuInput, reset, clock, MOC);
+ControlUnit CU(CUOut,CUInput, reset, clock, MOC);
 endmodule //end
 
 //MAR Module
@@ -93,14 +96,14 @@ module MAR(Qs, Ds, Ld, CLK);
   
   initial begin
   	Qs= 32'd0;
-		$display("MARLd =========================>  %b", Ld);
+		//$display("MARLd =========================>  %b", Ld);
   end
 
 always@(posedge CLK)
 	if (Ld) begin
 		Qs<=Ds;
 		$display("MAR =========================>  %b", Qs);
-		$display("MARLd =========================>  %b", Ld);
+		//$display("MARLd =========================>  %b", Ld);
 	end
 endmodule
 
@@ -310,14 +313,15 @@ initial begin
 			// $display("code = $b, data = %b", code, data);
 			RAM.Mem[loadPC] = data;
 			test_ram_out = RAM.Mem[loadPC];
-			// $display("space=%d, memory_data=%b", loadPC,test_ram_out);
+			 $display("space=%d, memory_data=%b", loadPC,test_ram_out);
 			loadPC = loadPC + 1;
 	end
 	$fclose(fileIn);
-	//done = 1;
+	MOC = 1;
 end
 
 reg [7:0] Mem[0:511];
+
 always @(posedge MOV) //Whenever Enable and/or MOV is active
 if(MOV) //If MOV=1, proceed with ReadWrite
 	begin
@@ -325,6 +329,7 @@ if(MOV) //If MOV=1, proceed with ReadWrite
 		begin
 		//DataOut = {Mem[Address], {Mem[Address+1], {Mem[Address+2], Mem[Address+3]}}}; //{Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
 		DataOut = {Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
+			$display("instruction =========================>  %b", DataOut);
 		MOC = 1'b1;
 		#2 MOC = 1'b0;
 		end
@@ -430,9 +435,9 @@ case(state)
     	5'b00010: //Estado 2
         signals = 14'b10001001101100;
     	5'b00011: //Estado 3
-        signals = 14'b00000001101100;
+        signals = 14'b00010001101100;
     	5'b00100: //Estado 4
-        signals = 14'b00000000000000;
+        signals = 14'b00010000000100;
     	5'b00101: //Estado 5 (R-Type)
         signals = 14'b10000100001000;
     	5'b00110: //Estado 6 (ADDI)
@@ -475,9 +480,11 @@ endmodule
 //Next State Decoder
 module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opcode, input MOC, input reset);
 always@(prev,opcode, MOC, reset, next)
+
 if (reset) begin
 	next = 5'b00000;
 end else begin
+	$display("OpCode =========================>  %b", opcode);
 	case(prev)
 		5'b00000: //State 0
 		next = 5'b00001;
@@ -493,8 +500,8 @@ end else begin
 		5'b00100: //State 4
 			case(opcode)
 				6'b000000: //Go to State 5
-				MOC =1;
-				next = 5'b00101;
+					//MOC =1;
+					next = 5'b00101;
 				6'b001000: //Go to State 6
 				next = 5'b00110;
 				6'b001001: //Go to State 6

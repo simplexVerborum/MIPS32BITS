@@ -179,8 +179,17 @@ module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, 
 		end
 endmodule
 
+//Memory to Register Multiplexer
+module MemToRegMux(output reg [31:0] data, input [31:0] readData, aluResult, input memToReg);
+always@(memToReg)
+if(memToReg)
+	data = readData;
+else
+	data = aluResult;
+endmodule
+
 //DataIn Multiplexer
-module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC_plus_8, dataFromRam input [1:0] regIn);
+module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC_plus_8, dataFromRam, input [1:0] regIn);
 	always@(regIn)
 	case (regIn)
 		2'b00: aluResult;
@@ -198,6 +207,7 @@ module RegSrcMux(output reg [4:0] destination, input [4:0] IR21_25, input [1:0] 
 		// 2'b10: data = HI
 	endcase
 endmodule
+
 
 //Register Destination Multiplexer
 module RegDstMux(output reg [4:0] destination, input [4:0] IR20_16, IR15_11, input [2:0] regDst);
@@ -245,7 +255,7 @@ module RegisterFile(output reg [31:0] OA, OB, input [31:0] dataIn, input [4:0] d
 endmodule
 
 //ALU Source Multiplexer
-module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, sa input [1:0] aluSrc);
+module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, sa, input [1:0] aluSrc);
 	always@(aluSrc)
 	case (aluSrc)
 		2'b00: data = extended;
@@ -256,37 +266,37 @@ endmodule
 
 //16 to 32 Extender
 module Extender(output [31:0] dataOut, input [15:0] dataIn);
-	always@(dataIn)
-	case (dataIn[15)
-		1'b0: dataOut = {16'b0000000000000000, dataIn}; 
-		1'b1: dataOut = {16'b1111111111111111, dataIn}; 
-	endcase
+	always@(dataIn) 
+	if (dataIn[15])
+		assign dataOut = {16'b0000000000000000, dataIn}; 
+	else
+		assign dataOut = {16'b1111111111111111, dataIn}; 
 endmodule
 
 //ALU Control
 module ALUControl(output reg [5:0] operation, input [5:0] funct, input ALUOP2, ALUOP1, ALUOP0);
-	reg [2:0] aluop;
-	initial begin
-	aluop = {ALUOP2, {ALUOP1, ALUOP0}};
-	case(aluop)
-		3'b000: //Add
-			operation = 6'b100000;
-		3'b001: //Sub
-			operation = 6'b100010;
-		3'b010: //FUNCT
-			operation = funct;
-		3'b011: //Shift
-			operation = 6'b111111;
-		3'b100: //SLT
-			operation = 6'b101011;
-		3'b101: //AND
-			operation = 6'b100100;
-		3'b110: //OR
-			operation = 6'b100101;
-		3'b111: //XOR
-			operation = 6'b100110;
-	endcase
-	end
+reg [2:0] aluop;
+initial begin
+aluop = {ALUOP2, {ALUOP1, ALUOP0}};
+case(aluop)
+	3'b000: //Add
+		operation = 6'b100000;
+	3'b001: //Sub
+		operation = 6'b100010;
+	3'b010: //FUNCT
+		operation = funct;
+	3'b011: //Shift
+		operation = 6'b111111;
+	3'b100: //SLT
+		operation = 6'b101011;
+	3'b101: //AND
+		operation = 6'b100100;
+	3'b110: //OR
+		operation = 6'b100101;
+	3'b111: //XOR
+		operation = 6'b100110;
+endcase
+end
 endmodule
 
 // ALU
@@ -457,9 +467,9 @@ module ControlSignalEncoder(output reg [20:0] signals, input [4:0] state);
 	always@(state)
 	case(state)
 		5'b00000: //Estado 0
-		signals = 21'b000000000000000000000;
+			signals = 21'b000000000000000000000;
 		5'b00001: //Estado 1 Instruction FETCH
-		signals = 21'b000000000000000000010;
+			signals = 21'b000000000000000000010;
 		5'b00010: //Estado 2
 			signals = 21'b000000000000000000010;
 		5'b00011: //Estado 3
@@ -469,38 +479,39 @@ module ControlSignalEncoder(output reg [20:0] signals, input [4:0] state);
 		5'b00101: //Estado 5 (Logic R-TYPE) ADD, ADDU, SUB, SUBU, SLT, SLTU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV
 			signals = 21'b100000110100000001000;
 		5'b00110: //Estado 6 (ADDI / ADDIU)
-
+			signals = 21'b000000000000000000000;
 		5'b00111: //Estado 7 (SLTI)
-
+			signals = 21'b000000000000000000000;
 		5'b01000: //Estado 8 (ANDI)
-			
+			signals = 21'b000000000000000000000;
 		5'b01001: //Estado 9 (ORI)
-			
+			signals = 21'b000000000000000000000;
 		5'b01010: //Estado 10 (XORI)
-			
+			signals = 21'b000000000000000000000;
 		5'b01011: //Estado 11 (LUI)
-		
+			signals = 21'b000000000000000000000;
 		5'b01100: //Estado 12 (BEQ)
-		
+			signals = 21'b000000000000000000000;
 		5'b01101: //Estado 13 (Jump)
-		
+			signals = 21'b000000000000000000000;
 		5'b01110: //Estado 14 (Load 1)
-		
+			signals = 21'b000000000000000000000;
 		5'b01111: //Estado 15 (Load 2)
-		
+			signals = 21'b000000000000000000000;
 		5'b10000: //Estado 16 (Load 3)
-		
+			signals = 21'b000000000000000000000;
 		5'b10001: //Estado 17 (Load 4)
-		
+			signals = 21'b000000000000000000000;
 		5'b10010: //Estado 18 (Store 1)
-		
+			signals = 21'b000000000000000000000;
 		5'b10011: //Estado 19 (Store 2)
-		
+			signals = 21'b000000000000000000000;
 		5'b10100: //Estado 20 (Store 3)
-		
+			signals = 21'b000000000000000000000;
 		5'b10101: //Estado 21 (Store 4)
-		
+			signals = 21'b000000000000000000000;
 		default: //Undefined
+			signals = 21'b000000000000000000000;
 	endcase
 endmodule
 
