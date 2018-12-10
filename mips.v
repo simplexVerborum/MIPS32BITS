@@ -87,6 +87,17 @@ ALUControl ALUControl(operation, funct, AluOp2, AluOp1, AluOp0);
 ControlUnit CU(CUOut,CUInput, reset, clock, MOC);
 endmodule //end
 
+//MUX for the selection of PC and ALU result
+module muxToMAR(output reg [31:0] data, input [31:0] pc, aluResult, input pcOrALu)
+	always@(pcOrALu)
+	case (pcOrAlu)
+		0: data = pc;
+		1: data = aluResult
+		default: 
+
+	endcase
+endmodule
+
 //MAR Module
 module MAR(Qs, Ds, Ld, CLK);
   output reg [8:0] Qs;
@@ -99,12 +110,14 @@ module MAR(Qs, Ds, Ld, CLK);
 		//$display("MARLd =========================>  %b", Ld);
   end
 
-always@(posedge CLK)
-	if (Ld) begin
-		Qs<=Ds;
-		$display("MAR =========================>  %b", Qs);
-		//$display("MARLd =========================>  %b", Ld);
-	end
+
+	always@(posedge CLK)
+		if (Ld) begin
+			Qs<=Ds;
+		end else begin
+			Qs= 32'd0;
+		end
+
 endmodule
 
 //MDR Module
@@ -125,7 +138,98 @@ always@(posedge CLK)
   
 endmodule
 
-//Register File
+
+//Memory with MemRead and MemWrite
+module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, MemWrite, input [8:0] Address, input [31:0] DataIn);
+	integer fileIn, code; reg [31:0] data;
+	reg[8:0] loadPC;
+	reg [7:0] test_ram_out;
+	initial begin
+		fileIn = $fopen("testcode.txt", "r");
+		loadPC = 9'd0;
+		//done = 0;
+		while (!$feof(fileIn)) begin
+				code = $fscanf(fileIn, "%b", data);
+				// $display("code = $b, data = %b", code, data);
+				RAM.Mem[loadPC] = data;
+				test_ram_out = RAM.Mem[loadPC];
+				// $display("space=%d, memory_data=%b", loadPC,test_ram_out);
+				loadPC = loadPC + 1;
+		end
+		$fclose(fileIn);
+		//done = 1;
+	end
+
+	reg [7:0] Mem[0:511];
+	always @(posedge MOV) //Whenever Enable and/or MOV is active
+	if(MOV) //If MOV=1, proceed with ReadWrite
+		begin
+		if(MemRead) //Read Operation (1)
+			begin
+			//DataOut = {Mem[Address], {Mem[Address+1], {Mem[Address+2], Mem[Address+3]}}}; //{Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
+			DataOut = {Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
+			MOC = 1'b1;
+			#2 MOC = 1'b0;
+			end
+		if(MemWrite)  //Write Operation (0)
+			begin
+			Mem[Address] = DataIn[31:24];
+			Mem[Address+1] = DataIn[23:16];
+			Mem[Address+2] = DataIn[15:8];
+			Mem[Address+3] = DataIn[7:0];
+			#1 DataOut = Mem[Address];
+			// MOC = 1'b1;
+			// #2 MOC = 1'b0;
+			MOC = MOV;
+			end
+		end
+endmodule
+
+//Memory to Register Multiplexer
+module MemToRegMux(output reg [31:0] data, input [31:0] readData, aluResult, input memToReg);
+	always@(memToReg)
+	if(memToReg)
+		data = readData;
+	else
+		data = aluResult;
+endmodule
+
+//DataIn Multiplexer
+module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC_plus_8, dataFromRam, input [1:0] regIn);
+	always@(regIn)
+	case (regIn)
+		2'b00: aluResult;
+		2'b01: PC_plus_8;
+		2'b10: dataFromRam; 
+	endcase
+endmodule
+
+// Register A_Input multiplexer 
+module RegSrcMux(output reg [4:0] destination, input [4:0] IR21_25, input [1:0] regSrc);
+	reg LO,HI;
+	always@(regSrc)
+	case (regSrc)
+		2'b00: data = IR21_25;
+		// 2'b01: data = LO,
+		// 2'b10: data = HI
+	endcase
+endmodule
+
+//Register Destination Multiplexer
+module RegDstMux(output reg [4:0] destination, input [4:0] IR20_16, IR15_11, input [2:0] regDst);
+	reg R_31, HI, LO; 
+	always@(regDst)
+	case (regDst)
+		// 3'b000: destination = LO;
+		// 3'b001: destination = H1;
+		// 3'b010: destination = R_31;
+		3'b011: destination = IR15_11;
+		3'b100: destination = IR20_16;
+	endcase
+endmodule
+
+//Register File TO-DO
+
 module RegisterFile(output reg [31:0] OA, OB, input [31:0] dataIn, input [4:0] destination, regAddressA, regAddressB, input write, clock);
 reg [31:0] registerFile [31:0];
 initial begin
@@ -158,12 +262,24 @@ always@(posedge clock)
 endmodule
 
 //ALU Source Multiplexer
-module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, input ALUSrc);
-always@(ALUSrc)
-if(ALUSrc)
-	data = extended;
-else
-	data = regData;
+
+module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, sa, input [1:0] aluSrc);
+	always@(aluSrc)
+	case (aluSrc)
+		2'b00: data = extended;
+		2'b01: data = sa;
+		2'b10: data = regData;
+	endcase
+endmodule
+
+//16 to 32 Extender
+module Extender(output [31:0] dataOut, input [15:0] dataIn);
+	always@(dataIn) 
+	if (dataIn[15])
+		assign dataOut = {16'b0000000000000000, dataIn}; 
+	else
+		assign dataOut = {16'b1111111111111111, dataIn}; 
+
 endmodule
 
 //Register Destination Multiplexer
@@ -409,72 +525,82 @@ else
 endmodule
 
 //Control Signal Encoder
-module ControlSignalEncoder(output reg [13:0] signals, input [4:0] state);
-/*
-signals[13] = RegDst
-signals[12] = Jump
-signals[11] = Branch
-signals[10] = MemRead
-signals[9] = MemToReg
-signals[8] = ALUOp0
-signals[7] = AlUOp1
-signals[6] = AlUOp2
-signals[5] = MemWrite
-signals[4] = ALUSrc
-signals[3] = RegWrite
-signals[2] = MOV
-signals[1] = MARLd
-signals[0] = MDRLd
-*/
-always@(state)
-case(state)
-	5'b00000: //Estado 0
-	signals = 14'b00000000000000;
-	5'b00001: //Estado 1
-	signals = 14'b00000001000010;
-    	5'b00010: //Estado 2
-        signals = 14'b10001001101100;
-    	5'b00011: //Estado 3
-        signals = 14'b00010001101100;
-    	5'b00100: //Estado 4
-        signals = 14'b00010000000100;
-    	5'b00101: //Estado 5 (R-Type)
-        signals = 14'b10000100001000;
-    	5'b00110: //Estado 6 (ADDI)
-        signals = 14'b00000101011000;
-    	5'b00111: //Estado 7 (SLTI)
-        signals = 14'b00000110011000;
-    	5'b01000: //Estado 8 (ANDI)
-        signals = 14'b10000111011000;
-    	5'b01001: //Estado 9 (ORI)
-        signals = 14'b00000000011000;
-    	5'b01010: //Estado 10 (XORI)
-        signals = 14'b00000001011000;
-    	5'b01011: //Estado 11 (LUI)
-        signals = 14'b00000011011000;
-    	5'b01100: //Estado 12 (BEQ)
-        signals = 14'b00100010000000;
-    	5'b01101: //Estado 13 (Jump)
-        signals = 14'b01000000000000;
-	5'b01110: //Estado 14 (Load 1)
-	signals = 14'b00000101010010;
-	5'b01111: //Estado 15 (Load 2)
-	signals = 14'b00010101000100;
-	5'b10000: //Estado 16 (Load 3)
-	signals = 14'b00010101000110;
-	5'b10001: //Estado 17 (Load 4)
-	signals = 14'b00001101001000;
-	5'b10010: //Estado 18 (Store 1)
-	signals = 14'b00000101010011;
-	5'b10011: //Estado 19 (Store 2)
-	signals = 14'b00000101100100;
-	5'b10100: //Estado 20 (Store 3)
-	signals = 14'b00000101110111;
-	5'b10101: //Estado 21 (Store 4)
-	signals = 14'b00000101000000;
-	default: //Undefined
-	signals = 14'b11111111111111;
-endcase
+
+module ControlSignalEncoder(output reg [20:0] signals, input [4:0] state);
+	/*
+
+	signals[20] = regW
+	signals[29] = RegIn0
+	signals[18] = RegIn1
+	signals[17] = RegSrc0
+	signals[16] = RegSrc1
+	signals[15] = RegDst0
+	signals[14] = RegDst1
+	signals[13] = RegDst2
+	signals[12] = MOV
+	signals[11] = AluSrc0
+	signals[10] = AluSrc1
+	signals[9] = AluOp0
+	signals[8] = AluOp1
+	signals[7] = AluOp2
+	signals[6] = MDR
+	signals[5] = MAR
+	signals[4] = PcMux
+	signals[3] = PCLoad
+	signals[2] = B
+	signals[1] = IR
+	signals[0] = RamW
+	*/
+	always@(state)
+	case(state)
+		5'b00000: //Estado 0
+			signals = 21'b000000000000000000000;
+		5'b00001: //Estado 1 Instruction FETCH
+			signals = 21'b000000000000000000010;
+		5'b00010: //Estado 2
+			signals = 21'b000000000000000000010;
+		5'b00011: //Estado 3
+			signals = 21'b000000000000000000010;
+		5'b00100: //Estado 4 verificar OPCODE
+			signals = 21'b000000000000000000000;
+		5'b00101: //Estado 5 (Logic R-TYPE) ADD, ADDU, SUB, SUBU, SLT, SLTU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV
+			signals = 21'b100000110100000001000;
+		5'b00110: //Estado 6 (ADDI / ADDIU)
+			signals = 21'b000000000000000000000;
+		5'b00111: //Estado 7 (SLTI)
+			signals = 21'b000000000000000000000;
+		5'b01000: //Estado 8 (ANDI)
+			signals = 21'b000000000000000000000;
+		5'b01001: //Estado 9 (ORI)
+			signals = 21'b000000000000000000000;
+		5'b01010: //Estado 10 (XORI)
+			signals = 21'b000000000000000000000;
+		5'b01011: //Estado 11 (LUI)
+			signals = 21'b000000000000000000000;
+		5'b01100: //Estado 12 (BEQ)
+			signals = 21'b000000000000000000000;
+		5'b01101: //Estado 13 (Jump)
+			signals = 21'b000000000000000000000;
+		5'b01110: //Estado 14 (Load 1)
+			signals = 21'b000000000000000000000;
+		5'b01111: //Estado 15 (Load 2)
+			signals = 21'b000000000000000000000;
+		5'b10000: //Estado 16 (Load 3)
+			signals = 21'b000000000000000000000;
+		5'b10001: //Estado 17 (Load 4)
+			signals = 21'b000000000000000000000;
+		5'b10010: //Estado 18 (Store 1)
+			signals = 21'b000000000000000000000;
+		5'b10011: //Estado 19 (Store 2)
+			signals = 21'b000000000000000000000;
+		5'b10100: //Estado 20 (Store 3)
+			signals = 21'b000000000000000000000;
+		5'b10101: //Estado 21 (Store 4)
+			signals = 21'b000000000000000000000;
+		default: //Undefined
+			signals = 21'b000000000000000000000;
+	endcase
+
 endmodule
 
 //Next State Decoder
