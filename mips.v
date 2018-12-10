@@ -1,4 +1,4 @@
-module MipsProcessor(output [31:0]DataOut, input reset, clock);
+module MipsProcessor(output [31:0] DataOut, input reset, clock);
 
 	//ProgramCounter
 	reg [8:0] PC = 0;
@@ -180,16 +180,16 @@ module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, 
 endmodule
 
 //DataIn Multiplexer
-module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC_plus_8, dataFromRam input [1:0] regIn);
+module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC_plus_8, dataFromRam, input [1:0] regIn);
 	always@(regIn)
 	case (regIn)
-		2'b00: aluResult;
-		2'b01: PC_plus_8;
-		2'b10: dataFromRam; 
+		2'b00: data = aluResult;
+		2'b01: data = PC_plus_8;
+		2'b10: data = dataFromRam; 
 	endcase
 endmodule
 // Register A_Input multiplexer 
-module RegSrcMux(output reg [4:0] destination, input [4:0] IR21_25, input [1:0] regSrc);
+module RegSrcMux(output reg [4:0] data, input [4:0] IR21_25, input [1:0] regSrc);
 	reg LO,HI;
 	always@(regSrc)
 	case (regSrc)
@@ -232,16 +232,17 @@ module RegisterFile(output reg [31:0] OA, OB, input [31:0] dataIn, input [4:0] d
 	registerFile[13] = 32'b00000000000000000000000000000000;
 	end
 	always@(posedge clock)
-		begin
-		if(write)
-			begin
+		if (write) begin
 			registerFile[destination] = dataIn;
-			if(~destination)
+			if (~destination) begin
 				registerFile[destination] = 0;
 			end
-		OA = registerFile[regAddressA];
-		OB = registerFile[regAddressB];
+
+		end else begin
+			OA = registerFile[regAddressA];
+			OB = registerFile[regAddressB];
 		end
+		
 endmodule
 
 //ALU Source Multiplexer
