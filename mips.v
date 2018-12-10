@@ -85,7 +85,7 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 endmodule //end
 
 //PC module
-module ProgramCounter(output [8:0] Qs, input [31:0] Ds, input Ld, CLK);
+module ProgramCounter(output reg [8:0] Qs, input [31:0] Ds, input Ld, CLK);
 	initial begin
 		Qs= 9'd0;
 		$display("ProgramCounter =========================>  %b", Ld);
@@ -97,9 +97,9 @@ module ProgramCounter(output [8:0] Qs, input [31:0] Ds, input Ld, CLK);
 		end
 endmodule
 
-module Intruction(output [31:0] Qs, input [31:0] Ds, input Ld, CLK);
+module Intruction(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);
 	initial begin
-		Qs= 32'd0;
+		Qs = 32'd0;
 	end
 
 	always@(posedge CLK)
@@ -109,20 +109,21 @@ module Intruction(output [31:0] Qs, input [31:0] Ds, input Ld, CLK);
 endmodule
 
 //MUX for the selection of PC and ALU result
-module muxToMAR(output reg [31:0] data, input [31:0] pc, aluResult, input pcOrALu)
-	always@(pcOrALu)
-	case (pcOrAlu)
-		0: data = pc;
-		1: data = aluResult
-		default: 
-
-	endcase
+module MarMux(output reg [31:0] data, input [8:0] programCounter, input [31:0] aluResult, input marMux);
+	always@(marMux)
+	if (marMux) begin
+		if (aluResult <= 32'd511) begin
+		data = {aluResult[9:0]};
+		end
+	end else begin
+		data = programCounter;
+	end
 endmodule
 
 //MAR Module
-module MAR(output [8:0] Qs, input [31:0] Ds, input Ld, CLK);
+module MAR(output reg [8:0] Qs, input [31:0] Ds, input Ld, CLK);
 	initial begin
-		Qs= 32'd0;
+		Qs = 32'd0;
 	end
 
 	always@(posedge CLK)
@@ -134,7 +135,7 @@ module MAR(output [8:0] Qs, input [31:0] Ds, input Ld, CLK);
 endmodule
 
 //MDR Module
-module MDR(output [31:0] Qs, input [31:0] Ds, input Ld, CLK);  
+module MDR(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);  
   initial begin
   	Qs= 32'd0;
   end
@@ -147,49 +148,53 @@ module MDR(output [31:0] Qs, input [31:0] Ds, input Ld, CLK);
 endmodule
 
 //Memory with MemRead and MemWrite
-module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, MemWrite, input [8:0] Address, input [31:0] DataIn);
-	integer fileIn, code; reg [31:0] data;
+module ram512x8 (output reg [31:0] DataOut, output reg MOC,
+input MOV, MemRead, MemWrite, input [8:0] Address, input [31:0] DataIn);
+
+integer fileIn, code; reg [31:0] data;
 	reg[8:0] loadPC;
 	reg [7:0] test_ram_out;
-	initial begin
-		fileIn = $fopen("testcode.txt", "r");
-		loadPC = 9'd0;
-		//done = 0;
-		while (!$feof(fileIn)) begin
-				code = $fscanf(fileIn, "%b", data);
-				// $display("code = $b, data = %b", code, data);
-				RAM.Mem[loadPC] = data;
-				test_ram_out = RAM.Mem[loadPC];
-				// $display("space=%d, memory_data=%b", loadPC,test_ram_out);
-				loadPC = loadPC + 1;
-		end
-		$fclose(fileIn);
-		//done = 1;
+initial begin
+	fileIn = $fopen("testcode.txt", "r");
+	loadPC = 9'd0;
+	//done = 0;
+	while (!$feof(fileIn)) begin
+			code = $fscanf(fileIn, "%b", data);
+			// $display("code = $b, data = %b", code, data);
+			RAM.Mem[loadPC] = data;
+			test_ram_out = RAM.Mem[loadPC];
+			$display("space=%d, memory_data=%b", loadPC,test_ram_out);
+			loadPC = loadPC + 1;
 	end
+	$fclose(fileIn);
+	MOC = 1;
+end
 
-	reg [7:0] Mem[0:511];
-	always @(posedge MOV) //Whenever Enable and/or MOV is active
-	if(MOV) //If MOV=1, proceed with ReadWrite
+reg [7:0] Mem[0:511];
+
+always @(posedge MOV) //Whenever Enable and/or MOV is active
+if(MOV) //If MOV=1, proceed with ReadWrite
+	begin
+	if(MemRead) //Read Operation (1)
 		begin
-		if(MemRead) //Read Operation (1)
-			begin
-			//DataOut = {Mem[Address], {Mem[Address+1], {Mem[Address+2], Mem[Address+3]}}}; //{Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
-			DataOut = {Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
-			MOC = 1'b1;
-			#2 MOC = 1'b0;
-			end
-		if(MemWrite)  //Write Operation (0)
-			begin
-			Mem[Address] = DataIn[31:24];
-			Mem[Address+1] = DataIn[23:16];
-			Mem[Address+2] = DataIn[15:8];
-			Mem[Address+3] = DataIn[7:0];
-			#1 DataOut = Mem[Address];
-			// MOC = 1'b1;
-			// #2 MOC = 1'b0;
-			MOC = MOV;
-			end
+		//DataOut = {Mem[Address], {Mem[Address+1], {Mem[Address+2], Mem[Address+3]}}}; //{Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
+		DataOut = {Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
+			$display("instruction =========================>  %b", DataOut);
+		MOC = 1'b1;
+		#2 MOC = 1'b0;
 		end
+	if(MemWrite)  //Write Operation (0)
+		begin
+		Mem[Address] = DataIn[31:24];
+		Mem[Address+1] = DataIn[23:16];
+		Mem[Address+2] = DataIn[15:8];
+		Mem[Address+3] = DataIn[7:0];
+		#1 DataOut = Mem[Address];
+		// MOC = 1'b1;
+		// #2 MOC = 1'b0;
+		MOC = MOV;
+		end
+	end
 endmodule
 
 //Memory to Register Multiplexer
@@ -205,14 +210,14 @@ endmodule
 module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC_plus_8, dataFromRam, input [1:0] regIn);
 	always@(regIn)
 	case (regIn)
-		2'b00: aluResult;
-		2'b01: PC_plus_8;
-		2'b10: dataFromRam; 
+		2'b00: data = aluResult;
+		2'b01: data = PC_plus_8;
+		2'b10: data = dataFromRam; 
 	endcase
 endmodule
 
 // Register A_Input multiplexer 
-module RegSrcMux(output reg [4:0] destination, input [4:0] IR21_25, input [1:0] regSrc);
+module RegSrcMux(output reg [4:0] data, input [4:0] IR21_25, input [1:0] regSrc);
 	reg LO,HI;
 	always@(regSrc)
 	case (regSrc)
@@ -278,7 +283,7 @@ module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, sa, inp
 endmodule
 
 //16 to 32 Extender
-module Extender(output [31:0] dataOut, input [15:0] dataIn);
+module Extender(output reg [31:0] dataOut, input [15:0] dataIn);
 	always@(dataIn) 
 	if (dataIn[15])
 		assign dataOut = {16'b0000000000000000, dataIn}; 
