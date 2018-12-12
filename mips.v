@@ -2,42 +2,54 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
 	//ProgramCounter
 	reg [8:0] PC = 0;
+
 	//Control Unit Variables
-	wire [20:0]CUOut;
+	wire [22:0]CUOut;
 	reg [5:0]CuInput;
+
+	// Ram MOC
 	wire MOC;
 
-	//Control Unit Outputs
-	wire MDRLd = CUOut[0];
-	wire MARLd = CUOut[1];
-	wire MOV = CUOut[2];
-	wire regWrite = CUOut[3];
-	wire ALUsrc = CUOut[4];
-	wire MemWrite = CUOut[5];
-	wire AluOp2 = CUOut[6];
-	wire AluOp1 = CUOut[7];
-	wire AluOp0 = CUOut[8]; 
-	wire MemToReg = CUOut[9];
-	wire MemRead = CUOut[10];
-	wire Branch = CUOut[11];
-	wire Jump = CUOut[12];
-	wire RegDst = CUOut[13];
+	//Control Unit Signals
+	wire marMux = CUOut[22];
+	wire regW = CUOut[21];
+	wire regIn1 = CUOut[20];
+	wire regIn0 = CUOut[19];
+	wire regSrc1 = CUOut[18];
+	wire regSrc0 = CUOut[17];
+	wire regDst2 = CUOut[16];
+	wire regDst1 = CUOut[15];
+	wire regDst0 = CUOut[14];
+	wire MOV = CUOut[13];
+	wire aluSrc1 = CUOut[12];
+	wire aluSrc0 = CUOut[11];
+	wire aluOp2 = CUOut[10];
+	wire aluOp1 = CUOut[9];
+	wire aluOp0 = CUOut[8];
+	wire MDR = CUOut[7];
+	wire MAR = CUOut[6];
+	wire pcMux = CUOut[5];
+	wire pcLd = CUOut[4];
+	wire B = CUOut[3];
+	wire IR = CUOut[2];
+	wire RamR = CUOut[1];
+	wire RamW = CUOut[0];
 
 
+	//////////Register File //////////
 
-	//Register File Variables
-	wire [31:0] OutRF_InAluA, OutRF_InAluSrcB;//B va para el mux
-	wire [4:0] outputSelectorA, outputSelectorB;
+	wire [31:0] regInOut, outA, outB; 
+	wire [4:0] regSrcOut, IR20_16, regDstOut;
+
+	//////////RegInMux//////////
+	wire [31:0] RAMout;
+	wire [31:0] PCplus8 = {16'b0000000000000000, }
 
 	//ALU Source Mux Variables
 	wire [31:0]outAluSrc_InAlu;
 	wire [31:0]singExtended;
 
-	//Register Destination Mux Variables
-	wire [4:0] destination;
-	wire [4:0] IR20_16, IR15_11, IR10_6;
-
-	//ALU Variables
+		//ALU Variables
 	wire [31:0]AluOut;
 	wire C,V;
 	wire [5:0] operation;
@@ -71,7 +83,7 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
 
 	//Datpath
-	// RegisterFile RegF(OutRF_InAluA, OutRF_InAluSrcB, MemtoRegMuxOut, destination, outputSelectorA, outputSelectorB, regWrite, clock);
+	RegisterFile RegF(OutRF_InAluA, OutRF_InAluSrcB, MemtoRegMuxOut, destination, outputSelectorA, outputSelectorB, regWrite, clock);
 	// ALUSrcMux ALUsrcMux1(outAluSrc_InAlu, OutRF_InAluSrcB, singExtended, ALUsrc);
 	// RegDstMux RegDstMux1(destination, IR20_16, IR15_11, RegDst);
 	// Alu_32bits alu1(AluOut, C, V, operation, OutRF_InAluA, outAluSrc_InAlu);
@@ -212,7 +224,7 @@ module RegSrcMux(output reg [4:0] data, input [4:0] IR21_25, input [1:0] regSrc)
 endmodule
 
 //Register Destination Multiplexer
-module RegDstMux(output reg [4:0] destination, input [4:0] IR20_16, IR15_11, input [2:0]regDst);
+module RegDstMux(output reg [4:0] destination, input [4:0] IR20_16, IR15_11, HI, LO, R_31, input [2:0]regDst);
 	reg R_31, HI, LO; 
 	always@(regDst)
 	case (regDst)
@@ -488,40 +500,26 @@ module ControlSignalEncoder(output reg [22:0] signals, input [4:0] state);
 			signals = 23'b00000000010000000000000;
 		5'b00101: //Estado 5 (Logic R-TYPE) ADD, ADDU, SUB, SUBU, SLT, SLTU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV
 			signals = 23'b01000011010000000000000;
-		5'b00110: //Estado 6 (ADDI / ADDIU)
-			signals = 23'b000000000000000000000;
-		5'b00111: //Estado 7 (SLTI)
-			signals = 23'b000000000000000000000;
-		5'b01000: //Estado 8 (ANDI)
-			signals = 23'b000000000000000000000;
-		5'b01001: //Estado 9 (ORI)
-			signals = 23'b000000000000000000000;
-		5'b01010: //Estado 10 (XORI)
-			signals = 23'b000000000000000000000;
-		5'b01011: //Estado 11 (LUI)
-			signals = 23'b000000000000000000000;
-		5'b01100: //Estado 12 (BEQ)
-			signals = 23'b000000000000000000000;
-		5'b01101: //Estado 13 (Jump)
-			signals = 23'b000000000000000000000;
-		5'b01110: //Estado 14 (Load 1)
-			signals = 23'b000000000000000000000;
-		5'b01111: //Estado 15 (Load 2)
-			signals = 23'b000000000000000000000;
-		5'b10000: //Estado 16 (Load 3)
-			signals = 23'b000000000000000000000;
-		5'b10001: //Estado 17 (Load 4)
-			signals = 23'b000000000000000000000;
-		5'b10010: //Estado 18 (Store 1)
-			signals = 23'b000000000000000000000;
-		5'b10011: //Estado 19 (Store 2)
-			signals = 23'b000000000000000000000;
-		5'b10100: //Estado 20 (Store 3)
-			signals = 23'b000000000000000000000;
-		5'b10101: //Estado 21 (Store 4)
-			signals = 23'b000000000000000000000;
+		5'b00110: //Estado 6 (CLO) - TO-DO
+			signals = 23'b00000000000000000000000;
+		5'b00111: //Estado 7 (CLZ) - TO-DO
+			signals = 23'b00000000000000000000000;
+		5'b01000: //Estado 8 (ADDI / ADDIU)
+			signals = 23'b01000010000000100000000;
+		5'b01001: //Estado 9 (SLTI / SLTUI)
+			signals = 23'b01000010000001000000000;
+		5'b01010: //Estado 10 (ANDI)
+			signals = 23'b01000010000001100000000;
+		5'b01011: //Estado 11 (ORI)
+			signals = 23'b01000010000010000000000;
+		5'b01100: //Estado 12 (XORI)
+			signals = 23'b01000010000010100000000;
+		5'b01101: //Estado 13 (LUI)
+			signals = 23'b01000010000011000000000;
+		5'b01110: //Estado 14 (SLL / SRA / SRL)
+			signals = 23'b01000001100100000000000;
 		default: //Undefined
-			signals = 23'b000000000000000000000;
+			signals = 23'b00000000000000000000000;
 	endcase
 endmodule
 
