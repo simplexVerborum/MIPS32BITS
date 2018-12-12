@@ -448,80 +448,80 @@ module StateRegister(output reg [4:0] next, input [4:0] prev, input clock, clear
 endmodule
 
 //Control Signal Encoder
-module ControlSignalEncoder(output reg [20:0] signals, input [4:0] state);
+module ControlSignalEncoder(output reg [22:0] signals, input [4:0] state);
 	/*
-
-	signals[21] = marMux
-	signals[20] = regW
-	signals[29] = RegIn0
-	signals[18] = RegIn1
-	signals[17] = RegSrc0
-	signals[16] = RegSrc1
-	signals[15] = RegDst0
-	signals[14] = RegDst1
-	signals[13] = RegDst2
-	signals[12] = MOV
-	signals[11] = AluSrc0
-	signals[10] = AluSrc1
-	signals[9] = AluOp0
-	signals[8] = AluOp1
-	signals[7] = AluOp2
-	signals[6] = MDR
-	signals[5] = MAR
-	signals[4] = PcMux
-	signals[3] = PCLoad
-	signals[2] = B
-	signals[1] = IR
+	signals[22] = marMux
+	signals[21] = regW
+	signals[20] = regIn1
+	signals[19] = regIn0
+	signals[18] = regSrc1
+	signals[17] = regSrc0
+	signals[16] = regDst2
+	signals[15] = regDst1
+	signals[14] = regDst0
+	signals[13] = MOV
+	signals[12] = aluSrc1
+	signals[11] = aluSrc0
+	signals[10] = aluOp2
+	signals[9] = aluOp1
+	signals[8] = aluOp0
+	signals[7] = MDR
+	signals[6] = MAR
+	signals[5] = pcMux
+	signals[4] = pcLd
+	signals[3] = B
+	signals[2] = IR
+	signals[1] = RamR
 	signals[0] = RamW
 	*/
 	always@(state)
 	case(state)
 		5'b00000: //Estado 0
-			signals = 21'b000000000000000000000;
-		5'b00001: //Estado 1 Instruction FETCH
-			signals = 21'b000000000000000000010;
-		5'b00010: //Estado 2
-			signals = 21'b000000000000000000010;
-		5'b00011: //Estado 3
-			signals = 21'b000000000000000000010;
+			signals = 23'b00000000000000000000000;
+		5'b00001: //Estado 1 Instruction FETCH... MAR and IR activated ---> Load PC to MAR
+			signals = 23'b00000000000000001000100;
+		5'b00010: //Estado 2 
+			signals = 23'b00000000000000000000100;
+		5'b00011: //Estado 3 PC + 4
+			signals = 23'b00000000000000000010000;
 		5'b00100: //Estado 4 verificar OPCODE
-			signals = 21'b000000000000000000000;
+			signals = 23'b00000000010000000000000;
 		5'b00101: //Estado 5 (Logic R-TYPE) ADD, ADDU, SUB, SUBU, SLT, SLTU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV
-			signals = 21'b100000110100000001000;
+			signals = 23'b01000011010000000000000;
 		5'b00110: //Estado 6 (ADDI / ADDIU)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b00111: //Estado 7 (SLTI)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b01000: //Estado 8 (ANDI)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b01001: //Estado 9 (ORI)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b01010: //Estado 10 (XORI)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b01011: //Estado 11 (LUI)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b01100: //Estado 12 (BEQ)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b01101: //Estado 13 (Jump)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b01110: //Estado 14 (Load 1)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b01111: //Estado 15 (Load 2)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b10000: //Estado 16 (Load 3)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b10001: //Estado 17 (Load 4)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b10010: //Estado 18 (Store 1)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b10011: //Estado 19 (Store 2)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b10100: //Estado 20 (Store 3)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		5'b10101: //Estado 21 (Store 4)
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 		default: //Undefined
-			signals = 21'b000000000000000000000;
+			signals = 23'b000000000000000000000;
 	endcase
 endmodule
 
@@ -642,7 +642,7 @@ module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opc
 endmodule
 
 // Control Unit
-module ControlUnit(output wire [20:0] signals, input [5:0] opcode, input reset, clock, MOC);
+module ControlUnit(output wire [22:0] signals, input [5:0] opcode, input reset, clock, MOC);
 	wire [4:0] state, next;
 	StateRegister SR(state, next, clock, reset);
 	ControlSignalEncoder CSE(signals, state);
