@@ -3,7 +3,7 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 	//ProgramCounter
 	reg [8:0] PC = 0;
 	//Control Unit Variables
-	wire [13:0]CUOut;
+	wire [20:0]CUOut;
 	reg [5:0]CuInput;
 	wire MOC;
 
@@ -35,7 +35,7 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
 	//Register Destination Mux Variables
 	wire [4:0] destination;
-	wire [4:0] IR20_16, IR15_11;
+	wire [4:0] IR20_16, IR15_11, IR10_6;
 
 	//ALU Variables
 	wire [31:0]AluOut;
@@ -71,24 +71,23 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
 
 	//Datpath
-	RegisterFile RegF(OutRF_InAluA, OutRF_InAluSrcB, MemtoRegMuxOut, destination, outputSelectorA, outputSelectorB, regWrite, clock);
-	ALUSrcMux ALUsrcMux1(outAluSrc_InAlu, OutRF_InAluSrcB, singExtended, ALUsrc);
-	RegDstMux RegDstMux1(destination, IR20_16, IR15_11, RegDst);
-	Alu_32bits alu1(AluOut, C, V, operation, OutRF_InAluA, outAluSrc_InAlu);
-	MAR mar1(MAROutput, AluOut, MARLd, clock);
-	MDR mdr1(MDROuput, OutRF_InAluSrcB, MDRLd, clock);
-	ram512x8 RAM(RAMDataOut, MOC, MOV, MemRead, MemWrite, MAROutput, MDROuput);
-	MemToRegMux MemToRegMux1(MemtoRegMuxOut, RAMDataOut, AluOut, MemToReg);
-	Extender singExtender(singExtended, dataIn);
-	ALUControl ALUControl(operation, funct, AluOp2, AluOp1, AluOp0);
-	ControlUnit CU(CUOut,CuInput, reset, clock, MOC);
+	// RegisterFile RegF(OutRF_InAluA, OutRF_InAluSrcB, MemtoRegMuxOut, destination, outputSelectorA, outputSelectorB, regWrite, clock);
+	// ALUSrcMux ALUsrcMux1(outAluSrc_InAlu, OutRF_InAluSrcB, singExtended, ALUsrc);
+	// RegDstMux RegDstMux1(destination, IR20_16, IR15_11, RegDst);
+	// Alu_32bits alu1(AluOut, C, V, operation, OutRF_InAluA, outAluSrc_InAlu);
+	// MAR mar1(MAROutput, AluOut, MARLd, clock);
+	// MDR mdr1(MDROuput, OutRF_InAluSrcB, MDRLd, clock);
+	// ram512x8 RAM(RAMDataOut, MOC, MOV, MemRead, MemWrite, MAROutput, MDROuput);
+	// MemToRegMux MemToRegMux1(MemtoRegMuxOut, RAMDataOut, AluOut, MemToReg);
+	// Extender singExtender(singExtended, dataIn);
+	// ALUControl ALUControl(operation, funct, AluOp2, AluOp1, AluOp0);
+	// ControlUnit CU(CUOut,CuInput, reset, clock, MOC);
 endmodule //end
 
 //PC module
-module ProgramCounter(output [8:0] Qs, input [31:0] Ds, input Ld, CLK);
+module ProgramCounter(output reg [8:0] Qs, input [8:0] Ds, input Ld, CLK);
 	initial begin
 		Qs= 9'd0;
-		$display("ProgramCounter =========================>  %b", Ld);
 	end
 
 	always@(posedge CLK)
@@ -97,7 +96,7 @@ module ProgramCounter(output [8:0] Qs, input [31:0] Ds, input Ld, CLK);
 		end
 endmodule
 
-module Intruction(output [31:0] Qs, input [31:0] Ds, input Ld, CLK);
+module Intruction(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);
 	initial begin
 		Qs= 32'd0;
 	end
@@ -106,35 +105,32 @@ module Intruction(output [31:0] Qs, input [31:0] Ds, input Ld, CLK);
 		if (Ld) begin
 			Qs<=Ds;
 		end
-endmodule
-
-//MUX for the selection of PC and ALU result
-module muxToMAR(output reg [31:0] data, input [31:0] pc, aluResult, input pcOrALu)
-	always@(pcOrALu)
-	case (pcOrAlu)
-		0: data = pc;
-		1: data = aluResult
-		default: 
-
-	endcase
 endmodule
 
 //MAR Module
-module MAR(output [8:0] Qs, input [31:0] Ds, input Ld, CLK);
+module MAR(output reg [8:0] Qs, input [8:0] Ds, input Ld, CLK);
 	initial begin
-		Qs= 32'd0;
+		Qs= 9'd0;
 	end
 
 	always@(posedge CLK)
 		if (Ld) begin
-			Qs<=Ds;
-		end else begin
-			Qs= 32'd0;
+			Qs = Ds;
 		end
 endmodule
 
+//MARMux for selecting PC or MAR result
+module MemAddressMux(output reg [4:0] data, input [8:0] pc, input [31:0] aluResult,  input pcOrMux);
+	always@(pcOrMux)
+	if (pcOrMux && aluResult <= 32'd511) begin
+		data = aluResult[8:0];
+	end else begin
+		data = pc;
+	end
+endmodule
+
 //MDR Module
-module MDR(output [31:0] Qs, input [31:0] Ds, input Ld, CLK);  
+module MDR(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);  
   initial begin
   	Qs= 32'd0;
   end
@@ -148,7 +144,9 @@ endmodule
 
 //Memory with MemRead and MemWrite
 module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, MemWrite, input [8:0] Address, input [31:0] DataIn);
+
 	integer fileIn, code; reg [31:0] data;
+	reg [7:0] Mem[0:511];
 	reg[8:0] loadPC;
 	reg [7:0] test_ram_out;
 	initial begin
@@ -158,16 +156,15 @@ module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, 
 		while (!$feof(fileIn)) begin
 				code = $fscanf(fileIn, "%b", data);
 				// $display("code = $b, data = %b", code, data);
-				RAM.Mem[loadPC] = data;
-				test_ram_out = RAM.Mem[loadPC];
-				// $display("space=%d, memory_data=%b", loadPC,test_ram_out);
+				Mem[loadPC] = data;
+				test_ram_out = Mem[loadPC];
+				$display("space=%d, memory_data=%b", loadPC, test_ram_out);
 				loadPC = loadPC + 1;
 		end
 		$fclose(fileIn);
-		//done = 1;
+		MOC = 1;
 	end
 
-	reg [7:0] Mem[0:511];
 	always @(posedge MOV) //Whenever Enable and/or MOV is active
 	if(MOV) //If MOV=1, proceed with ReadWrite
 		begin
@@ -175,6 +172,7 @@ module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, 
 			begin
 			//DataOut = {Mem[Address], {Mem[Address+1], {Mem[Address+2], Mem[Address+3]}}}; //{Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
 			DataOut = {Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
+				// $display("instruction =========================>  %b", DataOut);
 			MOC = 1'b1;
 			#2 MOC = 1'b0;
 			end
@@ -192,38 +190,29 @@ module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, 
 		end
 endmodule
 
-//Memory to Register Multiplexer
-module MemToRegMux(output reg [31:0] data, input [31:0] readData, aluResult, input memToReg);
-	always@(memToReg)
-	if(memToReg)
-		data = readData;
-	else
-		data = aluResult;
-endmodule
-
 //DataIn Multiplexer
-module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC_plus_8, dataFromRam, input [1:0] regIn);
+module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC, dataFromRam, input [1:0] regIn);
 	always@(regIn)
 	case (regIn)
-		2'b00: aluResult;
-		2'b01: PC_plus_8;
-		2'b10: dataFromRam; 
+		2'b00: data = aluResult;
+		2'b01: data = PC + 32'd8;
+		2'b10: data = dataFromRam; 
 	endcase
 endmodule
 
 // Register A_Input multiplexer 
-module RegSrcMux(output reg [4:0] destination, input [4:0] IR21_25, input [1:0] regSrc);
+module RegSrcMux(output reg [4:0] data, input [4:0] IR21_25, input [1:0] regSrc);
 	reg LO,HI;
 	always@(regSrc)
 	case (regSrc)
 		2'b00: data = IR21_25;
-		// 2'b01: data = LO,
-		// 2'b10: data = HI
+		// 2'b01: data = LO;
+		// 2'b10: data = HI;
 	endcase
 endmodule
 
 //Register Destination Multiplexer
-module RegDstMux(output reg [4:0] destination, input [4:0] IR20_16, IR15_11, input [2:0] regDst);
+module RegDstMux(output reg [4:0] destination, input [4:0] IR20_16, IR15_11, input [2:0]regDst);
 	reg R_31, HI, LO; 
 	always@(regDst)
 	case (regDst)
@@ -253,14 +242,34 @@ module RegisterFile(output reg [31:0] OA, OB, input [31:0] dataIn, input [4:0] d
 	registerFile[11] = 32'b00011001000001010000011100000100;
 	registerFile[12] = 32'b00010000000000001111111111111111;
 	registerFile[13] = 32'b00000000000000000000000000000000;
+	registerFile[14] = 32'b00000000000000000000000000000000;
+	registerFile[15] = 32'b00000000000000000000000000000000;
+	registerFile[16] = 32'b00000000000000000000000000000000;
+	registerFile[17] = 32'b00000000000000000000000000000000;
+	registerFile[18] = 32'b00000000000000000000000000000000;
+	registerFile[19] = 32'b00000000000000000000000000000000;
+	registerFile[20] = 32'b00000000000000000000000000000000;
+	registerFile[21] = 32'b00000000000000000000000000000000;
+	registerFile[22] = 32'b00000000000000000000000000000000;
+	registerFile[23] = 32'b00000000000000000000000000000000;
+	registerFile[24] = 32'b00000000000000000000000000000000;
+	registerFile[25] = 32'b00000000000000000000000000000000;
+	registerFile[26] = 32'b00000000000000000000000000000000;
+	registerFile[27] = 32'b00000000000000000000000000000000;
+	registerFile[18] = 32'b00000000000000000000000000000000;
+	registerFile[19] = 32'b00000000000000000000000000000000;
+	registerFile[30] = 32'b00000000000000000000000000000000;
+	registerFile[31] = 32'b00000000000000000000000000000000;	
+	
 	end
+	
 	always@(posedge clock)
 		begin
 		if(write)
 			begin
 			registerFile[destination] = dataIn;
 			if(~destination)
-				registerFile[destination] = 0;
+				registerFile[destination] = 32'd0;
 			end
 		OA = registerFile[regAddressA];
 		OB = registerFile[regAddressB];
@@ -268,7 +277,7 @@ module RegisterFile(output reg [31:0] OA, OB, input [31:0] dataIn, input [4:0] d
 endmodule
 
 //ALU Source Multiplexer
-module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, sa, input [1:0] aluSrc);
+module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, sa, input [1:0]aluSrc);
 	always@(aluSrc)
 	case (aluSrc)
 		2'b00: data = extended;
@@ -278,37 +287,24 @@ module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, sa, inp
 endmodule
 
 //16 to 32 Extender
-module Extender(output [31:0] dataOut, input [15:0] dataIn);
+module Extender(output reg [31:0] dataOut, input [15:0] dataIn);
 	always@(dataIn) 
 	if (dataIn[15])
-		assign dataOut = {16'b0000000000000000, dataIn}; 
+		dataOut = {16'b0000000000000000, dataIn}; 
 	else
-		assign dataOut = {16'b1111111111111111, dataIn}; 
+		dataOut = {16'b1111111111111111, dataIn}; 
 endmodule
 
 //ALU Control
-module ALUControl(output reg [5:0] operation, input [5:0] funct, input ALUOP2, ALUOP1, ALUOP0);
+module ALUControl(output reg [5:0] operation, input [5:0] fun, input ALUOP2, ALUOP1, ALUOP0);
 	reg [2:0] aluop;
-	initial begin
-	aluop = {ALUOP2, {ALUOP1, ALUOP0}};
-	case(aluop)
-		3'b000: //Add
-			operation = 6'b100000;
-		3'b001: //Sub
-			operation = 6'b100010;
-		3'b010: //FUNCT
-			operation = funct;
-		3'b011: //Shift
-			operation = 6'b111111;
-		3'b100: //SLT
-			operation = 6'b101011;
-		3'b101: //AND
-			operation = 6'b100100;
-		3'b110: //OR
-			operation = 6'b100101;
-		3'b111: //XOR
-			operation = 6'b100110;
-	endcase
+	always@(*)
+	begin
+		case({ALUOP2, ALUOP1, ALUOP0})
+			3'b000: operation = fun;
+			// TO-DO  set up opcodes for IMMEDIATE operations
+			3'b001: operation = 6'b100000; // ADDIU
+		endcase 
 	end
 endmodule
 
@@ -455,6 +451,7 @@ endmodule
 module ControlSignalEncoder(output reg [20:0] signals, input [4:0] state);
 	/*
 
+	signals[21] = marMux
 	signals[20] = regW
 	signals[29] = RegIn0
 	signals[18] = RegIn1
