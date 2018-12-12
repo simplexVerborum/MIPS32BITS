@@ -43,14 +43,30 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
 	//////////RegInMux//////////
 	wire [31:0] RAMout;
-	wire [31:0] PCplus8 = {16'b0000000000000000, }
+	wire [31:0] PCplus8 = {23'b00000000000000000000000, pc}
+	wire [31:0] aluOut;
+
+	//////////RegSrc//////////
+	wire [4:0] HI;
+	wire [4:0] LO;
+	wire [4:0] IR25_21;
+
+	//////////RegDstMux//////////
+	// wire [4:0] HI;
+	// wire [4:0] LO;
+	wire [4:0] R_31;
+	wire [4:0] IR15_11;
+	// wire [4:0] IR25_21;
+
 
 	//ALU Source Mux Variables
-	wire [31:0]outAluSrc_InAlu;
+	wire [31:0] aluSrcBout;
+	wire [31:0]singExtended;
 	wire [31:0]singExtended;
 
-		//ALU Variables
-	wire [31:0]AluOut;
+
+	//ALU Variables
+	wire [31:0]aluResult;
 	wire C,V;
 	wire [5:0] operation;
 
@@ -83,17 +99,24 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
 
 	//Datpath
-	RegisterFile RegF(OutRF_InAluA, OutRF_InAluSrcB, MemtoRegMuxOut, destination, outputSelectorA, outputSelectorB, regWrite, clock);
-	// ALUSrcMux ALUsrcMux1(outAluSrc_InAlu, OutRF_InAluSrcB, singExtended, ALUsrc);
-	// RegDstMux RegDstMux1(destination, IR20_16, IR15_11, RegDst);
-	// Alu_32bits alu1(AluOut, C, V, operation, OutRF_InAluA, outAluSrc_InAlu);
-	// MAR mar1(MAROutput, AluOut, MARLd, clock);
-	// MDR mdr1(MDROuput, OutRF_InAluSrcB, MDRLd, clock);
-	// ram512x8 RAM(RAMDataOut, MOC, MOV, MemRead, MemWrite, MAROutput, MDROuput);
-	// MemToRegMux MemToRegMux1(MemtoRegMuxOut, RAMDataOut, AluOut, MemToReg);
-	// Extender singExtender(singExtended, dataIn);
-	// ALUControl ALUControl(operation, funct, AluOp2, AluOp1, AluOp0);
-	// ControlUnit CU(CUOut,CuInput, reset, clock, MOC);
+	ProgramCounter pc();
+	// Instruction instruction();
+	// MAR mar();
+	// MemAddressMux memAddrMux();
+	// MDR mdr();
+	// ram512x8 ram();
+	// RegInMux regInMux();
+	// RegSrcMux regSrcMux();
+	// RegDstMux regDstMux();
+	// RegisterFile RegF(outA, outB, regInOut, regDstOut, regInOut, IR20_16, regW, clock);
+	// ALUSrcMux aluSrcMux();
+	// Extender signExtender();
+	// ALUControl aluCtrl();
+	// Alu_32bits alu();
+	// StateRegister stateReg();
+	// ControlSignalEncoder cse();
+	// NextStateDecoder nsd();
+	// ControlUnit cu();
 endmodule //end
 
 //PC module
