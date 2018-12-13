@@ -22,7 +22,7 @@ module mipsTester();
   end
 
   initial begin
-    // out = outW;
+    // // out = outW;
     // $display("time        clk        reset                out         ");
     // $monitor("%4d         %b          %b            %b     ", $time, clk, reset, outW) ;
   end

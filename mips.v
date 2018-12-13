@@ -1,4 +1,4 @@
-module MipsProcessor(output [31:0]DataOut, input reset, clock);
+module MipsProcessor(output [31:0] DataOut, input reset, clock);
 
 	//ProgramCounter
 	reg [8:0] program_counter = 0;
@@ -111,6 +111,9 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 	assign address26 = instructionOut[25:0];
 	assign funct = instructionOut[5:0];
 
+
+	assign DataOut = aluResult;
+
 	//Datpath
 	// ProgramCounter pc();
 	Instruction instruction(instructionOut, ramDataOut, IR, clock);
@@ -137,7 +140,7 @@ module ProgramCounter(output reg [8:0] Qs, input [8:0] Ds, input Ld, CLK);
 
 	always@(posedge CLK)
 		if (Ld) begin
-			Qs<=Ds;
+			Qs <= Ds + 9'd8;
 		end
 endmodule
 
@@ -155,12 +158,14 @@ endmodule
 //MAR Module
 module MAR(output reg [8:0] Qs, input [8:0] Ds, input Ld, CLK);
 	initial begin
-		Qs= 9'd0;
+		Qs = 9'd0;
 	end
 
 	always@(posedge CLK)
 		if (Ld) begin
-			Qs = Ds;
+			Qs <= Ds;
+			$display("MAR = ----------> %b", Qs);
+
 		end
 endmodule
 
@@ -272,19 +277,19 @@ endmodule
 module RegisterFile(output reg [31:0] OA, OB, input [31:0] dataIn, input [4:0] destination, regAddressA, regAddressB, input write, clock);
 	reg [31:0] registerFile [31:0];
 	initial begin
-	registerFile[0] = 32'b00100100000000010000000000101100;
-	registerFile[1] = 32'b10010000001000100000000000000000;
-	registerFile[2] = 32'b10010000001000110000000000000010;
-	registerFile[3] = 32'b00000000000000000010100000100001;
-	registerFile[4] = 32'b00000000101000100010100000100001;
-	registerFile[5] = 32'b00100100011000111111111111111111;
-	registerFile[6] = 32'b00011100011000001111111111111101;
+	registerFile[0] = 32'b00000000000000000000000000000000;
+	registerFile[1] = 32'b00000000000000000000000000000000;
+	registerFile[2] = 32'b00000000000000000000000000000000;
+	registerFile[3] = 32'b00000000000000000000000000000000;
+	registerFile[4] = 32'b00000000000000000000000000000000;
+	registerFile[5] = 32'b00000000000000000000000000000000;
+	registerFile[6] = 32'b00000000000000000000000000000000;
 	registerFile[7] = 32'b00000000000000000000000000000000;
-	registerFile[8] = 32'b10100000001001010000000000000001;
+	registerFile[8] = 32'b00000000000000000000000000000000;
 	registerFile[9] = 32'b00010000000000000000000000000010;
 	registerFile[10] = 32'b00000000000000000000000000000000;
-	registerFile[11] = 32'b00011001000001010000011100000100;
-	registerFile[12] = 32'b00010000000000001111111111111111;
+	registerFile[11] = 32'b00000000000000000000000000000000;
+	registerFile[12] = 32'b00000000000000000000000000000000;
 	registerFile[13] = 32'b00000000000000000000000000000000;
 	registerFile[14] = 32'b00000000000000000000000000000000;
 	registerFile[15] = 32'b00000000000000000000000000000000;
@@ -366,9 +371,9 @@ module Alu_32bits(output reg [31:0] Y,output reg zFlag, C, V, input[5:0]s, input
     integer c2 = 0; //variable para manejar el conteo de los ceros consecutivos.
     integer flag = 0;
     always@(s,A,B)
-    begin
+    		
+		begin
     case(s)
-
     6'b100100:
 			begin //bitwise and
 				V = 1'b0;
@@ -520,6 +525,10 @@ module Alu_32bits(output reg [31:0] Y,output reg zFlag, C, V, input[5:0]s, input
     {C,Y}=B<<16;
     end
     endcase
+
+		$display("Alu Result ----------> %b", Y);
+
+
     end
 endmodule
 
@@ -537,6 +546,9 @@ module StateRegister(output reg [4:0] next, input [4:0] prev, input clock, clear
 		if(clock)
 			state = prev;
 		next = state;
+
+		$display("state ----------> %b", state);
+
 	end
 endmodule
 
