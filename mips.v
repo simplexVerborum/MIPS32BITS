@@ -141,7 +141,7 @@ module ProgramCounter(output reg [8:0] Qs, input Ld, CLK);
 	always@(posedge CLK)
 	if (Ld && CLK) begin
 		Qs = Qs + 9'd4;
-		$display("PROGRAM COUNTER = ----------> %b", Qs);
+		// $display("PROGRAM COUNTER = ----------> %b", Qs);
 	end
 	
 endmodule
@@ -154,7 +154,7 @@ module Instruction(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);
 	always@(posedge CLK)
 		if (Ld && CLK) begin
 			Qs<=Ds;
-			$display("IR = ----------> %b", Qs);
+			// $display("IR = ----------> %b", Qs);
 		end
 endmodule
 
@@ -226,7 +226,7 @@ module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, 
 			begin
 			//DataOut = {Mem[Address], {Mem[Address+1], {Mem[Address+2], Mem[Address+3]}}}; //{Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
 			DataOut = {Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
-			$display("DataOut ---------->  %b", DataOut);
+			// $display("ramOUT ---------->  %b", DataOut);
 			MOC = 1'b1;
 			//#2 MOC = 1'b0;
 			end
@@ -355,173 +355,169 @@ module Extender(output reg [31:0] dataOut, input [15:0] dataIn);
 endmodule
 
 // ALU
-module Alu_32bits(output reg [31:0] Y,output reg zFlag, C, V, input[5:0]s, input[31:0] A,B);
+module Alu_32bits(output reg [31:0] Y,output reg zFlag, C, V, input[5:0] s, input[31:0] A,B);
     integer i;
     integer c = 0; //variable para manejar el conteo de los unos consecutivos.
     integer c2 = 0; //variable para manejar el conteo de los ceros consecutivos.
     integer flag = 0;
-    always@(s,A,B)
-    		
-		begin
-    case(s)
-    6'b100100:
-			begin //bitwise and
-				V = 1'b0;
-				C = 1'b0;
-				Y = A & B;
-				if (Y == 32'd0) begin
-					zFlag = 1;
-				end else begin
-					zFlag = 0;
+    always@(s,A,B) begin
+			case(s)
+				6'b100100:
+					begin //bitwise and
+						V = 1'b0;
+						C = 1'b0;
+						Y = A & B;
+						if (Y == 32'd0) begin
+							zFlag = 1;
+						end else begin
+							zFlag = 0;
+						end
+					end
+
+				6'b100101:
+					begin //bitwise or
+						V = 1'b0;
+						C = 1'b0;
+						Y = A | B;
+						if (Y == 32'd0) begin
+							zFlag = 1;
+						end else begin
+							zFlag = 0;
+						end
+					end
+
+				6'b100111:
+					begin //bitwise nor
+						V = 1'b0;
+						C = 1'b0;
+						Y = ~(A | B);
+						if (Y == 32'd0) begin
+								zFlag = 1;
+							end else begin
+								zFlag = 0;
+							end
+					end
+
+				6'b100110:
+					begin //bitwise ex-or
+						V = 1'b0;
+						C = 1'b0;
+						Y = A ^ B;
+						if (Y == 32'd0) begin
+							zFlag = 1;
+						end else begin
+							zFlag = 0;
+						end
+					end
+
+				6'b100001://Cuenta la cantidad de unos consecuticvos empezando en el bit mas significativo.
+				begin
+						flag=0;
+						c = 0;
+						for(i=31; i>=0; i=i-1)begin
+								if(A[i] == 1'b0)begin
+								flag = 1;
+								i = -1;
+								end
+						if(flag == 0) begin
+								c = c + 1;
+						end
 				end
-			end
+				assign Y = c;
 
-    6'b100101:
-			begin //bitwise or
-				V = 1'b0;
-				C = 1'b0;
-				Y = A | B;
-				if (Y == 32'd0) begin
-					zFlag = 1;
-				end else begin
-					zFlag = 0;
 				end
-			end
 
-    6'b100111:
-		begin //bitwise nor
-			V = 1'b0;
-			C = 1'b0;
-			Y = ~(A | B);
-			if (Y == 32'd0) begin
-					zFlag = 1;
-				end else begin
-					zFlag = 0;
+				6'b101011: //"menor que" sin signo
+					begin
+						V = 1'b0;
+						C = 1'b0;
+						Y = A<B;
+					end
+
+				6'b101010://"menor que" con signo
+					begin
+						V = 1'b0;
+						C = 1'b0;
+						assign C = 1'b0;
+						if((A[31]==1'b1 && B[31]==1'b0) || (A[31]==1'b0 && B[31]==1'b1))
+							Y = A>B;
+						else
+							Y = A<B;
+					end
+
+				6'b100000://suma con signo
+					begin
+						V = 1'b0;
+						C = 1'b0;
+						{C,Y} = A + B;
+						if(A[31]==1'b0 && B[31]==1'b0 && Y[31]==1)
+								V = 1'b1;
+						else if(A[31]==1'b1 && B[31]==1'b1 && Y[31]==0)
+								V = 1'b1;
+						
+						if (Y == 32'd0) begin
+							zFlag = 1;
+						end else begin
+							zFlag = 0;
+						end
+					end
+
+				6'b100010://resta con signo
+					begin
+						V = 1'b0;
+						assign C = 1'b0;
+						Y = ~B;
+						{C,Y} = A + Y + 1;
+						if(A[31]==1'b0 && B[31]==1'b1 && Y[31]==1)
+								V = 1'b1;
+						else if(A[31]==1'b1 && B[31]==1'b0 && Y[31]==0)
+								V = 1'b1;
+						
+						if (Y == 32'd0) begin
+							zFlag = 1;
+						end else begin
+							zFlag = 0;
+					end
 				end
-    end
 
-    6'b100110:
-			begin //bitwise ex-or
-				V = 1'b0;
-				C = 1'b0;
-				Y = A ^ B;
-				if (Y == 32'd0) begin
-					zFlag = 1;
-				end else begin
-					zFlag = 0;
+			6'b000000://shift left logico
+				begin
+					V = 1'b0;
+					assign C = 1'b0;
+					{C,Y}=A<<B;
+					
+					if (Y == 32'd0) begin
+						zFlag = 1;
+					end else begin
+						zFlag = 0;
+					end
 				end
-			end
 
-    6'b100001://Cuenta la cantidad de unos consecuticvos empezando en el bit mas significativo.
-    begin
-        flag=0;
-        c = 0;
-        for(i=31; i>=0; i=i-1)begin
-            if(A[i] == 1'b0)begin
-            flag = 1;
-            i = -1;
-            end
-        if(flag == 0) begin
-            c = c + 1;
-        end
-    end
-    assign Y = c;
-
-    end
-
-    6'b101011: //"menor que" sin signo
-    begin
-    V = 1'b0;
-    C = 1'b0;
-    Y = A<B;
-
-    end
-
-    6'b101010://"menor que" con signo
-    begin
-			V = 1'b0;
-			C = 1'b0;
-			assign C = 1'b0;
-			if((A[31]==1'b1 && B[31]==1'b0) || (A[31]==1'b0 && B[31]==1'b1))
-				Y = A>B;
-			else
-				Y = A<B;
-    end
-
-    6'b100000://suma con signo
-    begin
-        V = 1'b0;
-        C = 1'b0;
-        {C,Y} = A + B;
-        if(A[31]==1'b0 && B[31]==1'b0 && Y[31]==1)
-            V = 1'b1;
-        else if(A[31]==1'b1 && B[31]==1'b1 && Y[31]==0)
-            V = 1'b1;
-				
-				if (Y == 32'd0) begin
-					zFlag = 1;
-				end else begin
-					zFlag = 0;
+			6'b000010: //shift right logico
+				begin
+					V = 1'b0;
+					C = 1'b0;
+					{C,Y}=A>>B;
 				end
-    end
 
-    6'b100010://resta con signo
-    begin
-        V = 1'b0;
-        assign C = 1'b0;
-        Y = ~B;
-        {C,Y} = A + Y + 1;
-        if(A[31]==1'b0 && B[31]==1'b1 && Y[31]==1)
-            V = 1'b1;
-        else if(A[31]==1'b1 && B[31]==1'b0 && Y[31]==0)
-            V = 1'b1;
-				
-				if (Y == 32'd0) begin
-					zFlag = 1;
-				end else begin
-					zFlag = 0;
+			6'b000011:
+				begin
+					V = 1'b0;
+					C = 1'b0;
+					Y=A>>>B;
 				end
-    end
 
-    6'b000000://shift left logico
-			begin
-				V = 1'b0;
-				assign C = 1'b0;
-				{C,Y}=A<<B;
-				
-				if (Y == 32'd0) begin
-					zFlag = 1;
-				end else begin
-					zFlag = 0;
+			6'b111111://Load upper immediate
+				begin
+					V = 1'b0;
+					C = 1'b0;
+					{C,Y}=B<<16;
 				end
-			end
-
-    6'b000010: //shift right logico
-    begin
-    V = 1'b0;
-    C = 1'b0;
-    {C,Y}=A>>B;
-    end
-
-    6'b000011:
-    begin
-    V = 1'b0;
-    C = 1'b0;
-    Y=A>>>B;
-    end
-
-    6'b111111://Load upper immediate
-    begin
-    V = 1'b0;
-    C = 1'b0;
-    {C,Y}=B<<16;
-    end
-    endcase
-
-		$display("Alu Result ----------> %b", Y);
-
-
-    end
+			endcase
+			
+			$display("ALUResult: %b", Y);
+		end
+    
 endmodule
 
 //Memory to Register Multiplexer
@@ -535,28 +531,27 @@ endmodule
 
 //ALU Control
 module ALUControl(output reg [5:0] operation, input [5:0] funct, input ALUOP2, ALUOP1, ALUOP0);
-	reg [2:0] aluop;
-	initial begin
-	aluop = {ALUOP2, {ALUOP1, ALUOP0}};
-	case(aluop)
-		3'b000: //Add
-			operation = 6'b100000;
-		3'b001: //Sub
-			operation = 6'b100010;
-		3'b010: //FUNCT
-			operation = funct;
-		3'b011: //Shift
-			operation = 6'b111111;
-		3'b100: //SLT
-			operation = 6'b101011;
-		3'b101: //AND
-			operation = 6'b100100;
-		3'b110: //OR
-			operation = 6'b100101;
-		3'b111: //XOR
-			operation = 6'b100110;
+	
+	always@( funct, ALUOP2, ALUOP1, ALUOP0)
+	case({ALUOP2, {ALUOP1, ALUOP0}})
+		3'b000: // funct
+			assign operation = funct;
+		3'b001: // CLO
+			assign operation = 6'b100001;
+		3'b010: // CLZ
+			assign operation = 6'b100001;
+		3'b011: // ADD
+			assign operation = 6'b100000;
+		3'b100: // SLT
+			assign operation = 6'b101011;
+		3'b101: // AND
+			assign operation = 6'b100100;
+		3'b110: // OR
+			assign operation = 6'b100101;
+		3'b111: // XOR
+			assign operation = 6'b100110;
 	endcase
-	end
+	
 endmodule
 
 //State Register
@@ -626,19 +621,29 @@ module ControlSignalEncoder(output reg [22:0] signals, input [4:0] state);
 		5'b00111: //Estado 7 (CLZ) - TO-DO
 			signals = 23'b00000000000000000000000;
 		5'b01000: //Estado 8 (ADDI / ADDIU)
-			signals = 23'b01000010000000100000000;
-		5'b01001: //Estado 9 (SLTI / SLTUI)
-			signals = 23'b01000010000001000000000;
-		5'b01010: //Estado 10 (ANDI)
 			signals = 23'b01000010000001100000000;
-		5'b01011: //Estado 11 (ORI)
+		5'b01001: //Estado 9 (SLTI / SLTUI)
 			signals = 23'b01000010000010000000000;
+		5'b01010: //Estado 10 (ANDI)
+			signals = 23'b01000010000010100000000;
+		5'b01011: //Estado 11 (ORI)
+			signals = 23'b01000010000011000000000;
 		5'b01100: //Estado 12 (XORI)
 			signals = 23'b01000010000010100000000;
 		5'b01101: //Estado 13 (LUI)
 			signals = 23'b01000010000011000000000;
-		5'b01110: //Estado 14 (SLL / SRA / SRL)
+		5'b01110: //Estado 14 (LW)
+			signals = 23'b10000010000001101000000;
+		5'b01111: //Estado 15 (SRA)
+			signals = 23'b10000000000000110000001;
+		5'b10000: //Estado 16 (SRL)
 			signals = 23'b01000001100100000000000;
+		5'b10001: //Estado 17 (LOAD_INTERMEDIATE)
+			signals = 23'b01000001100100000000000;
+		5'b10010: //Estado 18 (LOAD_INTERMEDIATE)
+			signals = 23'b01000001100100000000000;
+		5'b10011: //Estado 19 (LW)
+			signals = 23'b10000000000000110000001;
 		default: //Undefined
 			signals = 23'b00000000000000000000000;
 	endcase
@@ -650,7 +655,7 @@ module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opc
 		next = 5'b00000;
 	end else begin
 		$display("OpCode ---------->  %b", opcode);
-		//$display("MOC ---------->  %b", MOC);
+		//$display("MOC  ---------->  %b", MOC);
 		case(prev)
 			5'b00000: //State 0
 			next = 5'b00001;
@@ -664,58 +669,58 @@ module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opc
 			else
 				next = 5'b00011;
 			5'b00100: //State 4
-			case(opcode)
-				6'b000000: //Go to State 5
-				next = 5'b00101;
-				6'b001000: //Go to State 6
-				next = 5'b00110;
-				6'b001001: //Go to State 6
-				next = 5'b01000;
-				6'b001010: //Go to State 7
-				next = 5'b00111;
-				6'b001011: //Go to State 7
-				next = 5'b00111;
-				6'b001100: //Go to State 8
-				next = 5'b01000;
-				6'b001101: //Go to State 9
-				next = 5'b01001;
-				6'b001110: //Go to State 10
-				next = 5'b01010;
-				6'b001111: //Go to State 11
-				next = 5'b01011;
-				6'b000100: //Go to State 12
-				next = 5'b01100;
-				6'b000001: //Go to State 12
-				next = 5'b01100;
-				6'b000111: //Go to State 12
-				next = 5'b01100;
-				6'b000110: //Go to State 12
-				next = 5'b01100;
-				6'b000101: //Go to State 12
-				next = 5'b01100;
-				6'b000010: //Go to State 13
-				next = 5'b01101;
-				6'b000011: //Go to State 13
-				next = 5'b01101;
-				6'b100011: //Go to State 14 (LW)
-				next = 5'b01110;
-				6'b100001: //Go to State 14 (LH?)
-				next = 5'b01110;
-				6'b100101: //Go to State 14 (LHU?)
-				next = 5'b01110;
-				6'b100000: //Go to State 14 (LB)
-				next = 5'b01110;
-				6'b100100: //Go to State 14 (LBU)
-				next = 5'b01110;
-				6'b111111: //Go to State 18 (SD?)
-				next = 5'b10010;
-				6'b101011: //Go to State 18 (SW)
-				next = 5'b10010;
-				6'b101001: //Go to State 18 (SH?)
-				next = 5'b10010;
-				6'b101000: //Go to State 18 (SB)
-				next = 5'b10010;
-			endcase
+				case(opcode)
+					6'b000000: //Go to State 5
+						next = 5'b00101;
+					6'b001000: //Go to State 6
+						next = 5'b00110;
+					6'b001001: //Go to State 6
+						next = 5'b01000;
+					6'b001010: //Go to State 7
+						next = 5'b00111;
+					6'b001011: //Go to State 7
+						next = 5'b00111;
+					6'b001100: //Go to State 8
+						next = 5'b01000;
+					6'b001101: //Go to State 9
+						next = 5'b01001;
+					6'b001110: //Go to State 10
+						next = 5'b01010;
+					6'b001111: //Go to State 11
+						next = 5'b01011;
+					6'b000100: //Go to State 12
+						next = 5'b01100;
+					6'b000001: //Go to State 12
+						next = 5'b01100;
+					6'b000111: //Go to State 12
+						next = 5'b01100;
+					6'b000110: //Go to State 12
+						next = 5'b01100;
+					6'b000101: //Go to State 12
+						next = 5'b01100;
+					6'b000010: //Go to State 13
+						next = 5'b01101;
+					6'b000011: //Go to State 13
+						next = 5'b01101;
+					6'b100011: //Go to State 14 (LW)
+						next = 5'b01110;
+					6'b100001: //Go to State 14 (LH?)
+						next = 5'b01110;
+					6'b100101: //Go to State 14 (LHU?)
+						next = 5'b01110;
+					6'b100000: //Go to State 14 (LB)
+						next = 5'b01110;
+					6'b100100: //Go to State 14 (LBU)
+						next = 5'b01110;
+					6'b111111: //Go to State 18 (SD?)
+						next = 5'b10010;
+					6'b101011: //Go to State 18 (SW)
+						next = 5'b10010;
+					6'b101001: //Go to State 18 (SH?)
+						next = 5'b10010;
+					6'b101000: //Go to State 18 (SB)
+						next = 5'b10010;
+				endcase
 			5'b00101: //State 5
 			next = 5'b00001;
 			5'b00110: //State 6
@@ -735,18 +740,18 @@ module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opc
 			5'b01101: //State 13
 			next = 5'b00001;
 			5'b01110: //State 14
-			case(opcode)
-				6'b100011: //Go to State 15 (LW)
-				next = 5'b01111;
-				6'b100001: //Go to State 15 (LH?)
-				next = 5'b01111;
-				6'b100101: //Go to State 15 (LHU?)
-				next = 5'b01111;
-				6'b100000: //Go to State 23 (LB)
-				next = 5'b10111;
-				6'b100100: //Go to State 23 (LBU)
-				next = 5'b10111;
-			endcase
+				case(opcode)
+					6'b100011: //Go to State 15 (LW)
+					next = 5'b01111;
+					6'b100001: //Go to State 15 (LH?)
+					next = 5'b01111;
+					6'b100101: //Go to State 15 (LHU?)
+					next = 5'b01111;
+					6'b100000: //Go to State 23 (LB)
+					next = 5'b10111;
+					6'b100100: //Go to State 23 (LBU)
+					next = 5'b10111;
+				endcase
 			5'b01111: //State 15 (Load Word)
 			next = 5'b10000;
 			5'b10000: //State 16 (Load Word)
