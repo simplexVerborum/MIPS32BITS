@@ -1,17 +1,14 @@
 module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
 	//ProgramCounter
-	reg [8:0] PC = 0;
+	reg [8:0] program_counter = 0;
+	wire [8:0] PCout;
 
 	//Control Unit Variables
-	wire [22:0]CUOut;
-	reg [5:0]CuInput;
-
-	// Ram MOC
-	wire MOC;
+	wire [22:0] CUOut;
 
 	//Control Unit Signals
-	wire marMux = CUOut[22];
+	wire pcOrMux = CUOut[22];
 	wire regW = CUOut[21];
 	wire regIn1 = CUOut[20];
 	wire regIn0 = CUOut[19];
@@ -26,14 +23,14 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 	wire aluOp2 = CUOut[10];
 	wire aluOp1 = CUOut[9];
 	wire aluOp0 = CUOut[8];
-	wire MDR = CUOut[7];
+	wire MDRLd = CUOut[7];
 	wire MAR = CUOut[6];
 	wire pcMux = CUOut[5];
 	wire pcLd = CUOut[4];
 	wire B = CUOut[3];
 	wire IR = CUOut[2];
-	wire RamR = CUOut[1];
-	wire RamW = CUOut[0];
+	wire ramR = CUOut[1];
+	wire ramW = CUOut[0];
 
 
 	//////////Register File //////////
@@ -43,8 +40,8 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 
 	//////////RegInMux//////////
 	wire [31:0] RAMout;
-	wire [31:0] PCplus8 = {23'b00000000000000000000000, pc}
-	wire [31:0] aluOut;
+	wire [31:0] PCplus8 = {23'b00000000000000000000000, program_counter};
+	wire [31:0] aluResult;
 
 	//////////RegSrc//////////
 	wire [4:0] HI;
@@ -58,65 +55,78 @@ module MipsProcessor(output [31:0]DataOut, input reset, clock);
 	wire [4:0] IR15_11;
 	// wire [4:0] IR25_21;
 
+	//////////Sign Extender//////////
+	wire [31:0] signExtendOut;
+	wire [15:0] imm16;
 
-	//ALU Source Mux Variables
+	//////////AluSrcMux//////////
 	wire [31:0] aluSrcBout;
 	wire [31:0]singExtended;
-	wire [31:0]singExtended;
+	wire [4:0] sa;
+	// wire [31:0] outB
 
-
-	//ALU Variables
-	wire [31:0]aluResult;
-	wire C,V;
+	//////////AluCtrl//////////
+	wire [2:0] aluOp;
+	wire [5:0] IR5_0;
 	wire [5:0] operation;
-
-	//MAR Variables
-	wire [8:0]MAROutput;
-
-	//MDR Variables
-	wire [31:0]MDROuput;
-
-	//RAM Variables
-	wire [31:0]RAMDataOut;
-	assign DataOut = RAMDataOut;
-
-	//Memory to Register Mux Variables
-	wire [31:0]MemtoRegMuxOut;
-
-	//Sign Extender Variables
-	wire [15:0] dataIn;
-
-	//ALU Control Variables
 	wire [5:0] funct;
-	wire [31:0] instruction = RAMDataOut;
-	//Instruction to corresponding variables
-	assign CUInput = instruction[31:26];
-	assign outputSelectorA = instruction[25:21];
-	assign outputSelectorB = instruction[20:16];
-	assign IR20_16 = instruction[20:16];
-	assign IR15_11 = instruction[15:11];
-	assign dataIn = instruction[15:0];
 
+	//////////ALU//////////
+	// wire [31:0]aluResult;
+	wire C,V, zflag;
+	// wire [31:0] aluSrcBout;
+	// wire [31:0] outA;
+
+
+	//////////MDR//////////
+	wire [31:0] mdrOutput;
+	// wire [31:0] IR20_16;
+
+
+	//////////MAR MUX//////////
+	wire [8:0] marMuxOut;
+	// wire [31:0]aluResult;
+	// reg [8:0] program_counter;
+
+	//////////MAR//////////
+	wire [8:0] marOut;
+	// wire [8:0] marMuxOut;
+ 
+	//RAM Variables
+	wire [31:0] ramDataOut;
+	wire MOC;
+
+
+	//Instruction Reg
+	wire [31:0] instructionOut;
+
+
+	//Instruction to corresponding variables
+	wire [5:0] opcode = instructionOut[31:26];
+	assign IR25_21 = instructionOut[25:21];
+	assign IR20_16 = instructionOut[20:16];
+	assign IR15_11 = instructionOut[15:11];
+	assign sa = instructionOut[10:6];
+	assign imm16 = instructionOut[15:0];
+	assign address26 = instructionOut[25:0];
+	assign funct = instructionOut[5:0];
 
 	//Datpath
-	ProgramCounter pc();
-	// Instruction instruction();
-	// MAR mar();
-	// MemAddressMux memAddrMux();
-	// MDR mdr();
-	// ram512x8 ram();
-	// RegInMux regInMux();
-	// RegSrcMux regSrcMux();
-	// RegDstMux regDstMux();
-	// RegisterFile RegF(outA, outB, regInOut, regDstOut, regInOut, IR20_16, regW, clock);
-	// ALUSrcMux aluSrcMux();
-	// Extender signExtender();
-	// ALUControl aluCtrl();
-	// Alu_32bits alu();
-	// StateRegister stateReg();
-	// ControlSignalEncoder cse();
-	// NextStateDecoder nsd();
-	// ControlUnit cu();
+	// ProgramCounter pc();
+	Instruction instruction(instructionOut, ramDataOut, IR, clock);
+	MAR mar(marOut,marMuxOut,MAR, clock);
+	MemAddressMux marMux(marMuxOut, program_counter, aluResult, pcOrMux);
+	MDR mdr(mdrOutput, outA, MDRLd, clock);
+	ram512x8 ram(ramDataOut, MOC, MOV, ramR, ramW, marOut, mdrOutput);
+	RegInMux regInMux(regInOut, aluResult, ramDataOut,program_counter, {regIn1, regIn0});
+	RegSrcMux regSrcMux(regSrcOut, IR25_21, {regSrc1, regSrc0});
+	RegDstMux regDstMux(regDstOut, IR20_16, IR15_11, HI, LO, R_31, {regDst2, regDst1, regDst0});
+	RegisterFile RegF(outA, outB, regInOut, regDstOut, regSrcOut, IR20_16, regW, clock);
+	ALUSrcMux aluSrcMux(aluSrcBout, outB, singExtended, sa, {aluSrc1, aluSrc0});
+	Extender signExtender(signExtendOut, imm16);
+	ALUControl aluCtrl(operation, funct, aluOp2, aluOp1, aluOp0);
+	Alu_32bits alu(aluResult, zflag,C, V, operation, outA, aluSrcBout);
+	ControlUnit cu(CUOut, opcode, MOC, reset, clock);
 endmodule //end
 
 //PC module
@@ -131,13 +141,13 @@ module ProgramCounter(output reg [8:0] Qs, input [8:0] Ds, input Ld, CLK);
 		end
 endmodule
 
-module Intruction(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);
+module Instruction(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);
 	initial begin
 		Qs= 32'd0;
 	end
 
 	always@(posedge CLK)
-		if (Ld) begin
+		if (Ld && CLK) begin
 			Qs<=Ds;
 		end
 endmodule
@@ -155,7 +165,7 @@ module MAR(output reg [8:0] Qs, input [8:0] Ds, input Ld, CLK);
 endmodule
 
 //MARMux for selecting PC or MAR result
-module MemAddressMux(output reg [4:0] data, input [8:0] pc, input [31:0] aluResult,  input pcOrMux);
+module MemAddressMux(output reg [8:0] data, input [8:0] pc, input [31:0] aluResult,  input pcOrMux);
 	always@(pcOrMux)
 	if (pcOrMux && aluResult <= 32'd511) begin
 		data = aluResult[8:0];
@@ -226,11 +236,11 @@ module ram512x8 (output reg [31:0] DataOut, output reg MOC, input MOV, MemRead, 
 endmodule
 
 //DataIn Multiplexer
-module RegInMux(output reg [31:0] data, input [31:0] aluResult, PC, dataFromRam, input [1:0] regIn);
+module RegInMux(output reg [31:0] data, input [31:0] aluResult, dataFromRam, input [8:0] program_counter, input [1:0] regIn);
 	always@(regIn)
 	case (regIn)
 		2'b00: data = aluResult;
-		2'b01: data = PC + 32'd8;
+		2'b01: data = {23'd0, program_counter} + 32'd8;
 		2'b10: data = dataFromRam; 
 	endcase
 endmodule
@@ -248,7 +258,6 @@ endmodule
 
 //Register Destination Multiplexer
 module RegDstMux(output reg [4:0] destination, input [4:0] IR20_16, IR15_11, HI, LO, R_31, input [2:0]regDst);
-	reg R_31, HI, LO; 
 	always@(regDst)
 	case (regDst)
 		// 3'b000: destination = LO;
@@ -312,11 +321,18 @@ module RegisterFile(output reg [31:0] OA, OB, input [31:0] dataIn, input [4:0] d
 endmodule
 
 //ALU Source Multiplexer
-module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, sa, input [1:0]aluSrc);
+module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, input [4:0] sa, input [1:0]aluSrc);
 	always@(aluSrc)
 	case (aluSrc)
 		2'b00: data = extended;
-		2'b01: data = sa;
+		2'b01: 
+			begin
+				if (sa[4] == 1) begin
+					data = {16'b1111111111111111, sa}; 
+				end else begin
+					data = {16'b0000000000000000, sa}; 
+				end
+			end
 		2'b10: data = regData;
 	endcase
 endmodule
@@ -325,9 +341,9 @@ endmodule
 module Extender(output reg [31:0] dataOut, input [15:0] dataIn);
 	always@(dataIn) 
 	if (dataIn[15])
-		dataOut = {16'b0000000000000000, dataIn}; 
-	else
 		dataOut = {16'b1111111111111111, dataIn}; 
+	else
+		dataOut = {16'b0000000000000000, dataIn}; 
 endmodule
 
 //ALU Control
@@ -344,7 +360,7 @@ module ALUControl(output reg [5:0] operation, input [5:0] fun, input ALUOP2, ALU
 endmodule
 
 // ALU
-module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A,B);
+module Alu_32bits(output reg [31:0] Y,output reg zFlag, C, V, input[5:0]s, input[31:0] A,B);
     integer i;
     integer c = 0; //variable para manejar el conteo de los unos consecutivos.
     integer c2 = 0; //variable para manejar el conteo de los ceros consecutivos.
@@ -353,29 +369,53 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
     begin
     case(s)
 
-    6'b100100:begin //bitwise and
-    V = 1'b0;
-    C = 1'b0;
-    Y = A & B;
+    6'b100100:
+			begin //bitwise and
+				V = 1'b0;
+				C = 1'b0;
+				Y = A & B;
+				if (Y == 32'd0) begin
+					zFlag = 1;
+				end else begin
+					zFlag = 0;
+				end
+			end
+
+    6'b100101:
+			begin //bitwise or
+				V = 1'b0;
+				C = 1'b0;
+				Y = A | B;
+				if (Y == 32'd0) begin
+					zFlag = 1;
+				end else begin
+					zFlag = 0;
+				end
+			end
+
+    6'b100111:
+		begin //bitwise nor
+			V = 1'b0;
+			C = 1'b0;
+			Y = ~(A | B);
+			if (Y == 32'd0) begin
+					zFlag = 1;
+				end else begin
+					zFlag = 0;
+				end
     end
 
-    6'b100101:begin //bitwise or
-    V = 1'b0;
-    C = 1'b0;
-    Y = A | B;
-    end
-
-    6'b100111:begin //bitwise nor
-    V = 1'b0;
-    C = 1'b0;
-    Y = ~(A | B);
-    end
-
-    6'b100110:begin //bitwise ex-or
-    V = 1'b0;
-    C = 1'b0;
-    Y = A ^ B;
-    end
+    6'b100110:
+			begin //bitwise ex-or
+				V = 1'b0;
+				C = 1'b0;
+				Y = A ^ B;
+				if (Y == 32'd0) begin
+					zFlag = 1;
+				end else begin
+					zFlag = 0;
+				end
+			end
 
     6'b100001://Cuenta la cantidad de unos consecuticvos empezando en el bit mas significativo.
     begin
@@ -402,13 +442,13 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
 
     6'b101010://"menor que" con signo
     begin
-    V = 1'b0;
-    C = 1'b0;
-    assign C = 1'b0;
-    if((A[31]==1'b1 && B[31]==1'b0) || (A[31]==1'b0 && B[31]==1'b1))
-    Y = A>B;
-    else
-    Y = A<B;
+			V = 1'b0;
+			C = 1'b0;
+			assign C = 1'b0;
+			if((A[31]==1'b1 && B[31]==1'b0) || (A[31]==1'b0 && B[31]==1'b1))
+				Y = A>B;
+			else
+				Y = A<B;
     end
 
     6'b100000://suma con signo
@@ -420,6 +460,12 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
             V = 1'b1;
         else if(A[31]==1'b1 && B[31]==1'b1 && Y[31]==0)
             V = 1'b1;
+				
+				if (Y == 32'd0) begin
+					zFlag = 1;
+				end else begin
+					zFlag = 0;
+				end
     end
 
     6'b100010://resta con signo
@@ -432,14 +478,26 @@ module Alu_32bits(output reg [31:0] Y,output reg C,V, input[5:0]s, input[31:0] A
             V = 1'b1;
         else if(A[31]==1'b1 && B[31]==1'b0 && Y[31]==0)
             V = 1'b1;
+				
+				if (Y == 32'd0) begin
+					zFlag = 1;
+				end else begin
+					zFlag = 0;
+				end
     end
 
     6'b000000://shift left logico
-    begin
-    V = 1'b0;
-    assign C = 1'b0;
-    {C,Y}=A<<B;
-    end
+			begin
+				V = 1'b0;
+				assign C = 1'b0;
+				{C,Y}=A<<B;
+				
+				if (Y == 32'd0) begin
+					zFlag = 1;
+				end else begin
+					zFlag = 0;
+				end
+			end
 
     6'b000010: //shift right logico
     begin
@@ -663,7 +721,7 @@ module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opc
 endmodule
 
 // Control Unit
-module ControlUnit(output wire [22:0] signals, input [5:0] opcode, input reset, clock, MOC);
+module ControlUnit(output wire [22:0] signals, input [5:0] opcode, input MOC, reset, clock);
 	wire [4:0] state, next;
 	StateRegister SR(state, next, clock, reset);
 	ControlSignalEncoder CSE(signals, state);
