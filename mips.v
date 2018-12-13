@@ -175,7 +175,7 @@ endmodule
 
 //MARMux for selecting PC or MAR result
 module MemAddressMux(output reg [8:0] data, input [8:0] pc, input [31:0] aluResult,  input pcOrMux);
-	always@(pcOrMux)
+	always@(pcOrMux, aluResult, pc)
 	if (pcOrMux && aluResult <= 32'd511) begin
 		data = aluResult[8:0];
 	end else begin
@@ -617,7 +617,7 @@ module ControlSignalEncoder(output reg [22:0] signals, input [4:0] state);
 		5'b00010: //Estado 2 
 			signals = 23'b00000000000000000000100;
 		5'b00011: //Estado 3 PC + 4
-			signals = 23'b00000000000000000010000;
+			signals = 23'b00000000000000001010000;
 		5'b00100: //Estado 4 verificar OPCODE
 			signals = 23'b00000000010000000000010;
 		5'b00101: //Estado 5 (Logic R-TYPE) ADD, ADDU, SUB, SUBU, SLT, SLTU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV
