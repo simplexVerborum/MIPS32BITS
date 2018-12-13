@@ -92,14 +92,14 @@ module MAR(output reg [8:0] Qs, input [31:0]  Ds, input Ld, CLK);
 
   initial begin
   	Qs= 32'd0;
-		//$display("MARLd =========================>  %b", Ld);
+		//$display("MARLd ----->  %b", Ld);
   end
 
 always@(posedge CLK)
 	if (Ld) begin
 		Qs<=Ds;
-		$display("MAR =========================>  %b", Qs);
-		//$display("MARLd =========================>  %b", Ld);
+		$display("MAR ----->  %b", Qs);
+		//$display("MARLd ----->  %b", Ld);
 	end
 endmodule
 
@@ -327,7 +327,7 @@ module ram512x8 (output reg [31:0] DataOut, output reg MOC,
 			begin
 			//DataOut = {Mem[Address], {Mem[Address+1], {Mem[Address+2], Mem[Address+3]}}}; //{Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
 			DataOut = {Mem[Address], Mem[Address+1], Mem[Address+2], Mem[Address+3]};
-				$display("instruction =========================>  %b", DataOut);
+				$display("instruction ----->  %b", DataOut);
 			MOC = 1'b1;
 			#2 MOC = 1'b0;
 			end
@@ -401,7 +401,7 @@ module StateRegister(output reg [4:0] next, input [4:0] prev, input clock, clear
 			state = prev;
 		next = state;
 
-		$display("state =========================>  %b", state);
+		$display("state ----->  %b", state);
 
 		end
 endmodule
@@ -482,7 +482,7 @@ module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opc
 	if (reset) begin
 		next = 5'b00000;
 	end else begin
-		$display("OpCode =========================>  %b", opcode);
+		$display("OpCode ----->  %b", opcode);
 		case(prev)
 			5'b00000: //State 0
 			next = 5'b00001;
