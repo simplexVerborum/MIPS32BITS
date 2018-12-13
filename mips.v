@@ -139,11 +139,10 @@ module ProgramCounter(output reg [8:0] Qs, input Ld, CLK);
 	end
 
 	always@(posedge CLK)
-		if (Ld && CLK) begin
-			Qs <= Qs + 9'd4;
-			$display("PROGRAM COUNTER = ----------> %b", Qs);
-
-		end
+	if (Ld && CLK) begin
+		Qs = Qs + 9'd4;
+		$display("PROGRAM COUNTER = ----------> %b", Qs);
+	end
 	
 endmodule
 
