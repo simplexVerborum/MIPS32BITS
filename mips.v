@@ -2,7 +2,7 @@ module MipsProcessor(output [31:0] DataOut, input reset, clock);
 
 	//ProgramCounter
 	reg [8:0] program_counter = 0;
-	wire [8:0] PCout;
+	wire [8:0] pcOut;
 
 	//Control Unit Variables
 	wire [22:0] CUOut;
@@ -115,13 +115,13 @@ module MipsProcessor(output [31:0] DataOut, input reset, clock);
 	assign DataOut = aluResult;
 
 	//Datpath
-	// ProgramCounter pc();
+	ProgramCounter pc(pcOut, pcLd, clock);
 	Instruction instruction(instructionOut, ramDataOut, IR, clock);
 	MAR mar(marOut,marMuxOut,MAR, clock);
-	MemAddressMux marMux(marMuxOut, program_counter, aluResult, pcOrMux);
+	MemAddressMux marMux(marMuxOut, pcOut, aluResult, pcOrMux);
 	MDR mdr(mdrOutput, outA, MDRLd, clock);
 	ram512x8 ram(ramDataOut, MOC, MOV, ramR, ramW, marOut, mdrOutput);
-	RegInMux regInMux(regInOut, aluResult, ramDataOut,program_counter, {regIn1, regIn0});
+	RegInMux regInMux(regInOut, aluResult, ramDataOut,pcOut, {regIn1, regIn0});
 	RegSrcMux regSrcMux(regSrcOut, IR25_21, {regSrc1, regSrc0});
 	RegDstMux regDstMux(regDstOut, IR20_16, IR15_11, HI, LO, R_31, {regDst2, regDst1, regDst0});
 	RegisterFile RegF(outA, outB, regInOut, regDstOut, regSrcOut, IR20_16, regW, clock);
@@ -133,15 +133,18 @@ module MipsProcessor(output [31:0] DataOut, input reset, clock);
 endmodule //end
 
 //PC module
-module ProgramCounter(output reg [8:0] Qs, input [8:0] Ds, input Ld, CLK);
+module ProgramCounter(output reg [8:0] Qs, input Ld, CLK);
 	initial begin
 		Qs= 9'd0;
 	end
 
 	always@(posedge CLK)
-		if (Ld) begin
-			Qs <= Ds + 9'd8;
+		if (Ld && CLK) begin
+			Qs <= Qs + 9'd4;
+			$display("PROGRAM COUNTER = ----------> %b", Qs);
+
 		end
+	
 endmodule
 
 module Instruction(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);
