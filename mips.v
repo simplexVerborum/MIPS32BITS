@@ -146,6 +146,31 @@ module ProgramCounter(output reg [8:0] Qs, input Ld, CLK);
 	
 endmodule
 
+// output reg [8:0] Qs, input [5:0] opcode, input [15:0] imm16, input[4:0] rs, rt, input Ld, CLK
+
+//Brnach Mgix Box 
+module BranchMagicBox(output reg [8:0] Qs, input [5:0] opcode, input [15:0] imm16, input[4:0] rs, rt, input Ld, CLK);
+	reg [15:0] temp;
+	
+	initial begin
+		Qs= 9'd0;
+	end
+
+	always@(posedge CLK)
+	if (Ld && CLK) begin
+
+		temp = imm16 * 16'd4;
+		
+		if (temp > 511) begin
+			Qs= 9'd0;
+		end else begin
+			Qs= temp[8:0];
+		end
+	end
+	
+endmodule
+
+
 module Instruction(output reg [31:0] Qs, input [31:0] Ds, input Ld, CLK);
 	initial begin
 		Qs= 32'd0;
@@ -536,8 +561,8 @@ module ALUControl(output reg [5:0] operation, input [5:0] funct, input ALUOP2, A
 	case({ALUOP2, {ALUOP1, ALUOP0}})
 		3'b000: // funct
 			assign operation = funct;
-		3'b001: // CLO
-			assign operation = 6'b100001;
+		3'b001: // LUI
+			assign operation = 6'b111111;
 		3'b010: // CLZ
 			assign operation = 6'b100001;
 		3'b011: // ADD
@@ -616,33 +641,47 @@ module ControlSignalEncoder(output reg [22:0] signals, input [4:0] state);
 			signals = 23'b00000000010000000000010;
 		5'b00101: //Estado 5 (Logic R-TYPE) ADD, ADDU, SUB, SUBU, SLT, SLTU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV
 			signals = 23'b01000011010000000000000;
-		5'b00110: //Estado 6 (CLO) - TO-DO
-			signals = 23'b00000000000000000000000;
-		5'b00111: //Estado 7 (CLZ) - TO-DO
-			signals = 23'b00000000000000000000000;
-		5'b01000: //Estado 8 (ADDI / ADDIU)
+		5'b00110: //Estado 6 ---> ADDI / ADDIU
 			signals = 23'b01000010000001100000000;
-		5'b01001: //Estado 9 (SLTI / SLTUI)
+		5'b00111: //Estado 7 ---> SLTI / SLT
 			signals = 23'b01000010000010000000000;
-		5'b01010: //Estado 10 (ANDI)
+		5'b01000: //Estado 8 ---> ANDI
 			signals = 23'b01000010000010100000000;
-		5'b01011: //Estado 11 (ORI)
+		5'b01001: //Estado 9 ---> ORI
 			signals = 23'b01000010000011000000000;
-		5'b01100: //Estado 12 (XORI)
+		5'b01010: //Estado 10 ---> XORI
+			signals = 23'b01000010000011100000000;
+		5'b01011: //Estado 11 ---> LUI
+			signals = 23'b01000010000000100000000;
+		5'b01100: //Estado 12  ---> BEQ / B / BGEZ / BGEZAL / BGTZ / BNE
 			signals = 23'b01000010000010100000000;
-		5'b01101: //Estado 13 (LUI)
+		5'b01101: //Estado 13 ---> J / JAL
 			signals = 23'b01000010000011000000000;
-		5'b01110: //Estado 14 (LW)
-			signals = 23'b10000010000001101000000;
-		5'b01111: //Estado 15 (SRA)
+		5'b01110: //Estado 14 ---> LW / LH / LHU / LB / LBU ---> calcular eff-address
+			signals = 23'b10000000010001101000000;
+		5'b01111: //Estado 15 ---> LOAD_INT ---> Tomar eff-address del LOAD y escribir en el Register file el resultado en la direccion RT
+			signals = 23'b01110010010000000000010;
+		5'b10000: //Estado 16 ---> 
+			signals = 23'b01110010010000000000010;
+		5'b10001: //Estado 17 ---> 
+			signals = 23'b01110010010000000000010;
+		5'b10010: //Estado 18 ---> SD / SW / SH / SB ---> calcular eff-address
+			signals = 23'b01000001100100000000000;
+		5'b10011: //Estado 19  ---> Tomar eff-address del STORE y escribir en el RAM el valor de RT
 			signals = 23'b10000000000000110000001;
-		5'b10000: //Estado 16 (SRL)
-			signals = 23'b01000001100100000000000;
-		5'b10001: //Estado 17 (LOAD_INTERMEDIATE)
-			signals = 23'b01000001100100000000000;
-		5'b10010: //Estado 18 (LOAD_INTERMEDIATE)
-			signals = 23'b01000001100100000000000;
-		5'b10011: //Estado 19 (LW)
+		5'b10100: //Estado 20 
+			signals = 23'b10000000000000110000001;
+		5'b10101: //Estado 21 
+			signals = 23'b10000000000000110000001;
+		5'b10110: //Estado 22 
+			signals = 23'b10000000000000110000001;
+		5'b10111: //Estado 23 
+			signals = 23'b10000000000000110000001;
+		5'b11000: //Estado 24 
+			signals = 23'b10000000000000110000001;
+		5'b11001: //Estado 25 
+			signals = 23'b10000000000000110000001;
+		5'b11010: //Estado 26
 			signals = 23'b10000000000000110000001;
 		default: //Undefined
 			signals = 23'b00000000000000000000000;
@@ -670,61 +709,61 @@ module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opc
 				next = 5'b00011;
 			5'b00100: //State 4
 				case(opcode)
-					6'b000000: //Go to State 5
+					6'b000000: //Go to State 5 ---> TYPE R aritmetic ops
 						next = 5'b00101;
-					6'b001000: //Go to State 6
+					6'b001000: //Go to State 6 ---> ADDI 
 						next = 5'b00110;
-					6'b001001: //Go to State 6
-						next = 5'b01000;
-					6'b001010: //Go to State 7
+					6'b001001: //Go to State 6 ---> ADDIU
+						next = 5'b00110;
+					6'b001010: //Go to State 7 ---> SLTI
 						next = 5'b00111;
-					6'b001011: //Go to State 7
+					6'b001011: //Go to State 7 ---> SLT
 						next = 5'b00111;
-					6'b001100: //Go to State 8
+					6'b001100: //Go to State 8 ---> ANDI
 						next = 5'b01000;
-					6'b001101: //Go to State 9
+					6'b001101: //Go to State 9 ---> ORI
 						next = 5'b01001;
-					6'b001110: //Go to State 10
+					6'b001110: //Go to State 10 ---> XORI
 						next = 5'b01010;
-					6'b001111: //Go to State 11
+					6'b001111: //Go to State 11 ---> LUI
 						next = 5'b01011;
-					6'b000100: //Go to State 12
+					6'b000100: //Go to State 12 ---> BEQ / B
 						next = 5'b01100;
-					6'b000001: //Go to State 12
+					6'b000001: //Go to State 12 ---> BGEZ / BGEZAL
 						next = 5'b01100;
-					6'b000111: //Go to State 12
+					6'b000111: //Go to State 12 ---> BGTZ
 						next = 5'b01100;
-					6'b000110: //Go to State 12
+					6'b000110: //Go to State 12 ---> BLEZ
 						next = 5'b01100;
-					6'b000101: //Go to State 12
+					6'b000101: //Go to State 12 ---> BNE
 						next = 5'b01100;
-					6'b000010: //Go to State 13
+					6'b000010: //Go to State 13 ---> J
 						next = 5'b01101;
-					6'b000011: //Go to State 13
+					6'b000011: //Go to State 13 ---> JAL
 						next = 5'b01101;
-					6'b100011: //Go to State 14 (LW)
+					6'b100011: //Go to State 14 ---> LW
 						next = 5'b01110;
-					6'b100001: //Go to State 14 (LH?)
+					6'b100001: //Go to State 14 ---> LH
 						next = 5'b01110;
-					6'b100101: //Go to State 14 (LHU?)
+					6'b100101: //Go to State 14 ---> LHU
 						next = 5'b01110;
-					6'b100000: //Go to State 14 (LB)
+					6'b100000: //Go to State 14 ---> LB
 						next = 5'b01110;
-					6'b100100: //Go to State 14 (LBU)
+					6'b100100: //Go to State 14 ---> LBU
 						next = 5'b01110;
-					6'b111111: //Go to State 18 (SD?)
+					6'b111111: //Go to State 18 ---> SD
 						next = 5'b10010;
-					6'b101011: //Go to State 18 (SW)
+					6'b101011: //Go to State 18 ---> SW
 						next = 5'b10010;
-					6'b101001: //Go to State 18 (SH?)
+					6'b101001: //Go to State 18 ---> SH
 						next = 5'b10010;
-					6'b101000: //Go to State 18 (SB)
+					6'b101000: //Go to State 18 ---> SB
 						next = 5'b10010;
 				endcase
-			5'b00101: //State 5
+			5'b00101: //State 5 
 			next = 5'b00001;
 			5'b00110: //State 6
-			next = 5'b00001;
+			next = 5'b00001; 
 			5'b00111: //State 7
 			next = 5'b00001;
 			5'b01000: //State 8
