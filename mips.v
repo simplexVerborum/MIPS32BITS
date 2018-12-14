@@ -141,14 +141,12 @@ module ProgramCounter(output reg [8:0] Qs, input Ld, CLK);
 	always@(posedge CLK)
 	if (Ld && CLK) begin
 		Qs = Qs + 9'd4;
-		// $display("PROGRAM COUNTER = ----------> %b", Qs);
+		$display("PROGRAM COUNTER ----------> %b", Qs);
 	end
 	
 endmodule
 
-// output reg [8:0] Qs, input [5:0] opcode, input [15:0] imm16, input[4:0] rs, rt, input Ld, CLK
-
-//Brnach Mgix Box 
+//Branch Mgix Box 
 module BranchMagicBox(output reg [8:0] Qs, input [5:0] opcode, input [15:0] imm16, input[4:0] rs, rt, input Ld, CLK);
 	// reg [15:0] temp;
 	
@@ -207,7 +205,7 @@ module MAR(output reg [8:0] Qs, input [8:0] Ds, input Ld, CLK);
 	always@(posedge CLK)
 		if (Ld) begin
 			Qs <= Ds;
-			$display("MAR = ----------> %b", Qs);
+			$display("MAR ----------> %d", Qs);
 
 		end
 endmodule
@@ -550,10 +548,10 @@ module Alu_32bits(output reg [31:0] Y,output reg zFlag, C, V, input[5:0] s, inpu
 				end
 			endcase
 			
-			$display("ALUResult: %b", Y);
-			$display("s ----------> %b", s);
-			$display("A ----------> %b", A);
-			$display("B ----------> %b", B);
+			$display("ALUResult: ------> %d", Y);
+			$display("s: %b", s);
+			$display("A: %d", A);
+			$display("B: %d", B);
 		end
     
 endmodule
@@ -655,7 +653,7 @@ module ControlSignalEncoder(output reg [22:0] signals, input [4:0] state);
 		5'b00101: //Estado 5 (Logic R-TYPE) ADD, ADDU, SUB, SUBU, SLT, SLTU, AND, OR, NOR, XOR, SLLV, SRAV, SRLV
 			signals = 23'b01000011010000000000000;
 		5'b00110: //Estado 6 ---> ADDI / ADDIU
-			signals = 23'b01000010000001100000000;
+			signals = 23'b01000010000101100000000;
 		5'b00111: //Estado 7 ---> SLTI / SLT
 			signals = 23'b01000010000010000000000;
 		5'b01000: //Estado 8 ---> ANDI
@@ -706,7 +704,7 @@ module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opc
 	if (reset) begin
 		next = 5'b00000;
 	end else begin
-		$display("OpCode ---------->  %b", opcode);
+		$display("OpCode: %b", opcode);
 		//$display("MOC  ---------->  %b", MOC);
 		case(prev)
 			5'b00000: //State 0
