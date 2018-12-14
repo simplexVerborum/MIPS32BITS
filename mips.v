@@ -125,7 +125,7 @@ module MipsProcessor(output [31:0] DataOut, input reset, clock);
 	RegSrcMux regSrcMux(regSrcOut, IR25_21, {regSrc1, regSrc0});
 	RegDstMux regDstMux(regDstOut, IR20_16, IR15_11, HI, LO, R_31, {regDst2, regDst1, regDst0});
 	RegisterFile RegF(outA, outB, regInOut, regDstOut, regSrcOut, IR20_16, regW, clock);
-	ALUSrcMux aluSrcMux(aluSrcBout, outB, singExtended, sa, {aluSrc1, aluSrc0});
+	ALUSrcMux aluSrcMux(aluSrcBout, outB, signExtendOut, sa, {aluSrc1, aluSrc0});
 	Extender signExtender(signExtendOut, imm16);
 	ALUControl aluCtrl(operation, funct, aluOp2, aluOp1, aluOp0);
 	Alu_32bits alu(aluResult, zflag,C, V, operation, outA, aluSrcBout);
@@ -358,14 +358,9 @@ module ALUSrcMux(output reg [31:0] data, input [31:0] regData, extended, input [
 	always@(aluSrc)
 	case (aluSrc)
 		2'b00: data = extended;
-		2'b01: 
-			begin
-				if (sa[4] == 1) begin
-					data = {16'b1111111111111111, sa}; 
-				end else begin
-					data = {16'b0000000000000000, sa}; 
-				end
-			end
+		
+		2'b01: data = sa;
+			
 		2'b10: data = regData;
 	endcase
 endmodule
@@ -541,6 +536,9 @@ module Alu_32bits(output reg [31:0] Y,output reg zFlag, C, V, input[5:0] s, inpu
 			endcase
 			
 			$display("ALUResult: %b", Y);
+			$display("s ----------> %b", s);
+			$display("A ----------> %b", A);
+			$display("B ----------> %b", B);
 		end
     
 endmodule
@@ -601,7 +599,7 @@ module StateRegister(output reg [4:0] next, input [4:0] prev, input clock, clear
 endmodule
 
 //Control Signal Encoder
-module ControlSignalEncoderOld(output reg [22:0] signals, input [4:0] state);
+module ControlSignalEncoder(output reg [22:0] signals, input [4:0] state);
 	/*
 	signals[22] = marMux
 	signals[21] = regW
@@ -688,7 +686,7 @@ module ControlSignalEncoderOld(output reg [22:0] signals, input [4:0] state);
 	endcase
 endmodule
 
-module NextStateDecoderOld(output reg [4:0] next, input [4:0] prev, input [5:0] opcode, input MOC, reset);
+module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opcode, input MOC, reset);
 	always@(prev, opcode)
 	if (reset) begin
 		next = 5'b00000;
@@ -841,14 +839,14 @@ module NextStateDecoderOld(output reg [4:0] next, input [4:0] prev, input [5:0] 
 endmodule
 
 // Control Unit
-module ControlUnitOld(output wire [22:0] signals, input [5:0] opcode, input MOC, reset, clock);
+module ControlUnit(output wire [22:0] signals, input [5:0] opcode, input MOC, reset, clock);
 	wire [4:0] state, next;
 	StateRegister SR(state, next, clock, reset);
 	ControlSignalEncoder CSE(signals, state);
 	NextStateDecoder NSD(next, state, opcode, MOC, reset);
 endmodule
 
-module ControlSignalEncoder(output reg [18:0] signals, input [4:0] state);
+module ControlSignalEncoderTest(output reg [18:0] signals, input [4:0] state);
 	/*
 	signals[18] = B1;
 	signals[17] = B0;
@@ -933,7 +931,7 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////////////////
 //Next State Decoder
 ////////////////////////////////////////////////////////////////////////////////////////////
-module NextStateDecoder(output reg [4:0] next, input [4:0] prev, input [5:0] opcode, input MOC);
+module NextStateDecoderTest(output reg [4:0] next, input [4:0] prev, input [5:0] opcode, input MOC);
 	always@(prev, opcode)
 	case(prev)
 		5'b00000: //State 0
@@ -1081,9 +1079,9 @@ endmodule
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Control Unit
 ////////////////////////////////////////////////////////////////////////////////////////////
-module ControlUnit(output wire [18:0] signals, input [5:0] opcode, input reset, clock, MOC);
+module ControlUnitTest(output wire [18:0] signals, input [5:0] opcode, input reset, clock, MOC);
 	wire [4:0] state, next;
 	StateRegister SR(state, next, clock, reset);
-	ControlSignalEncoder CSE(signals, state);
-	NextStateDecoder NSD(next, state, opcode, MOC);
+	ControlSignalEncoderTest CSE(signals, state);
+	NextStateDecoderTest NSD(next, state, opcode, MOC);
 endmodule
